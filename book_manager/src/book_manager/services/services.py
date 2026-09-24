@@ -61,7 +61,7 @@ class ServicioCotizacion:
   def actualizar_cotizaciones(self) -> List[CotizacionDolar]:
     """Actualiza el histórico de cotizaciones desde la API."""
     datos: List[Dict] = self.obtener_cotizaciones_actuales()
-    hoy: str = date.today().isoformat()
+    hoy: date = date.today()
     actualizadas: List[CotizacionDolar] = []
 
     for item in datos:
