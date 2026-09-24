@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import abc
+from datetime import date
 from typing import Optional
 
 
@@ -280,7 +281,7 @@ class CotizacionDolar(EntidadBase):
   def __init__(
     self,
     tipo: TipoCotizacion,
-    fecha: str,
+    fecha: date,
     valor_compra: float,
     valor_venta: float,
     id: Optional[int] = None,
@@ -300,11 +301,11 @@ class CotizacionDolar(EntidadBase):
     self._tipo = valor
 
   @property
-  def fecha(self) -> str:
+  def fecha(self) -> date:
     return self._fecha
 
   @fecha.setter
-  def fecha(self, valor: str) -> None:
+  def fecha(self, valor: date) -> None:
     self._fecha = valor
 
   @property
@@ -326,5 +327,5 @@ class CotizacionDolar(EntidadBase):
   def __repr__(self) -> str:
     return (
       f"CotizacionDolar(tipo={self.tipo.nombre!r}, "
-      f"fecha={self.fecha!r}, venta={self.valor_venta})"
+      f"fecha={self.fecha.isoformat()!r}, venta={self.valor_venta})"
     )
