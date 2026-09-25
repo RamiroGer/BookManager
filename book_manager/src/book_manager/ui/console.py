@@ -26,13 +26,22 @@ from book_manager.services.services import (
 )
 
 
+def _confirmar_accion(mensaje: str) -> bool:
+  """Pregunta al usuario si desea continuar con la acción."""
+  respuesta: str = input(f"{mensaje} (s/n): ").strip().lower()
+  return respuesta == "s"
+
+
 def menu_generos(repo_genero: RepositorioGenero) -> None:
   """Lista los géneros y permite dar de alta uno nuevo."""
   print("\n--- Listado de Géneros ---")
   for genero in repo_genero.leer_todos():
     print(f"  {genero}")
 
-  print("\n--- Alta de Género ---")
+  if not _confirmar_accion("\n¿Desea dar de alta un género?"):
+    print("Operación cancelada.")
+    return
+
   nombre: str = input("Nombre del género: ")
   nuevo: Genero = repo_genero.crear(Genero(nombre=nombre))
   print(f"Creado: {nuevo}")
@@ -44,7 +53,10 @@ def menu_editoriales(repo_editorial: RepositorioEditorial) -> None:
   for editorial in repo_editorial.leer_todos():
     print(f"  {editorial}")
 
-  print("\n--- Alta de Editorial ---")
+  if not _confirmar_accion("\n¿Desea dar de alta una editorial?"):
+    print("Operación cancelada.")
+    return
+
   nombre: str = input("Nombre de la editorial: ")
   pais: str = input("País: ")
   nueva: Editorial = repo_editorial.crear(
@@ -59,7 +71,10 @@ def menu_monedas(repo_moneda: RepositorioMoneda) -> None:
   for moneda in repo_moneda.leer_todos():
     print(f"  {moneda}")
 
-  print("\n--- Alta de Moneda ---")
+  if not _confirmar_accion("\n¿Desea dar de alta una moneda?"):
+    print("Operación cancelada.")
+    return
+
   codigo: str = input("Código (ej. ARS): ")
   nombre: str = input("Nombre: ")
   nueva: Moneda = repo_moneda.crear(
@@ -76,7 +91,12 @@ def menu_tipos_cotizacion(
   for tipo in repo_tipo.leer_todos():
     print(f"  {tipo}")
 
-  print("\n--- Alta de Tipo de Cotización ---")
+  if not _confirmar_accion(
+    "\n¿Desea dar de alta un tipo de cotización?"
+  ):
+    print("Operación cancelada.")
+    return
+
   nombre: str = input("Nombre del tipo: ")
   nuevo: TipoCotizacion = repo_tipo.crear(
     TipoCotizacion(nombre=nombre)
@@ -96,7 +116,14 @@ def menu_libros(
   for libro in repo_libro.leer_todos():
     print(f"  {libro}")
 
-  print("\n--- Alta de Libro ---")
+  if not _confirmar_accion("\n¿Desea dar de alta un libro?"):
+    print("Operación cancelada.")
+    return
+
+  if not repo_editorial.leer_todos() or not repo_genero.leer_todos():
+    print("Debe existir al menos una editorial y un género.")
+    return
+
   isbn: str = input("ISBN: ")
   titulo: str = input("Título: ")
   autor: str = input("Autor: ")
@@ -143,7 +170,10 @@ def menu_precios(
   for precio in repo_precio.leer_todos():
     print(f"  {precio}")
 
-  print("\n--- Consultar Precio en USD ---")
+  if not _confirmar_accion("\n¿Desea consultar un precio en USD?"):
+    print("Operación cancelada.")
+    return
+
   libro_id: int = int(input("ID de libro: "))
   tipos = repo_tipo.leer_todos()
   for t in tipos:
@@ -171,7 +201,10 @@ def menu_stock(
   for stock in repo_stock.leer_todos():
     print(f"  {stock}")
 
-  print("\n--- Modificar Stock ---")
+  if not _confirmar_accion("\n¿Desea modificar el stock?"):
+    print("Operación cancelada.")
+    return
+
   libro_id: int = int(input("ID de libro: "))
   cantidad: int = int(
     input("Cantidad (positiva=ingreso, negativa=egreso): ")
@@ -197,7 +230,12 @@ def menu_cotizaciones(
   for cot in repo_cotizacion.leer_todos():
     print(f"  {cot}")
 
-  print("\n--- Actualizar Cotizaciones desde DolarAPI ---")
+  if not _confirmar_accion(
+    "\n¿Desea actualizar cotizaciones desde DolarAPI?"
+  ):
+    print("Operación cancelada.")
+    return
+
   nuevas = servicio_cotizacion.actualizar_cotizaciones()
   print(f"Cotizaciones nuevas agregadas: {len(nuevas)}")
   for cot in nuevas:
