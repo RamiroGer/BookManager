@@ -126,7 +126,7 @@ def menu_libros(
 
   isbn: str = input("ISBN: ")
   titulo: str = input("Título: ")
-  autor: str = input("Autor: ")
+  autor: str = input("Autor (opcional): ").strip() or "Desconocido"
 
   for e in repo_editorial.leer_todos():
     print(f"  [{e.id}] {e.nombre}")
