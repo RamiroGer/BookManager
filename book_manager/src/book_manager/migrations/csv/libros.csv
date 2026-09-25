@@ -1,0 +1,12 @@
+id,isbn,titulo,autor,editorial_id,genero_id
+1,978-1,Cien Años de Soledad,Gabriel García Márquez,1,1
+2,978-2,Rayuela,Julio Cortázar,2,1
+3,978-3,El Principito,Antoine de Saint-Exupéry,3,3
+4,978-4,Sapiens,Yuval Noah Harari,4,4
+5,978-5,1984,George Orwell,5,7
+6,978-6,Ficciones,Jorge Luis Borges,6,1
+7,978-7,El Aleph,Jorge Luis Borges,7,1
+8,978-8,Dune,Frank Herbert,8,7
+9,978-9,El Resplandor,Stephen King,9,8
+10,978-10,Recetas de mi Abuela,Autor Varios,10,10
+11,978-2,Rayuela,d,8,5
