@@ -130,15 +130,21 @@ def menu_libros(
 
   for e in repo_editorial.leer_todos():
     print(f"  [{e.id}] {e.nombre}")
-  editorial_id: int = int(input("ID de editorial: "))
+    editorial_id: int = int(input("ID de editorial: "))
   editorial: Optional[Editorial] = repo_editorial.leer_por_id(
     editorial_id
   )
+  if editorial is None:
+    print(f"No existe una editorial con id={editorial_id}.")
+    return
 
   for g in repo_genero.leer_todos():
     print(f"  [{g.id}] {g.nombre}")
-  genero_id: int = int(input("ID de género: "))
+    genero_id: int = int(input("ID de género: "))
   genero: Optional[Genero] = repo_genero.leer_por_id(genero_id)
+  if genero is None:
+    print(f"No existe un género con id={genero_id}.")
+    return
 
   precio: float = float(input("Precio (ARS): "))
   cantidad: int = int(input("Cantidad inicial de stock: "))
