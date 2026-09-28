@@ -536,7 +536,7 @@ class RepositorioCotizacionDolar(
     return [
       str(entidad.id),
       str(entidad.tipo.id),
-      entidad.fecha.isoformat(),
+      entidad.fecha,
       str(entidad.valor_compra),
       str(entidad.valor_venta),
     ]
