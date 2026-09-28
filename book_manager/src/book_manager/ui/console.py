@@ -130,7 +130,7 @@ def menu_libros(
 
   for e in repo_editorial.leer_todos():
     print(f"  [{e.id}] {e.nombre}")
-    editorial_id: int = int(input("ID de editorial: "))
+  editorial_id: int = int(input("ID de editorial: "))
   editorial: Optional[Editorial] = repo_editorial.leer_por_id(
     editorial_id
   )
@@ -140,16 +140,22 @@ def menu_libros(
 
   for g in repo_genero.leer_todos():
     print(f"  [{g.id}] {g.nombre}")
-    genero_id: int = int(input("ID de género: "))
+  genero_id: int = int(input("ID de género: "))
   genero: Optional[Genero] = repo_genero.leer_por_id(genero_id)
   if genero is None:
     print(f"No existe un género con id={genero_id}.")
     return
 
-  precio: float = float(input("Precio (ARS): "))
+  precio_ars: float = float(input("Precio (ARS): "))
+  precio_usd: float = float(input("Precio (USD): "))
   cantidad: int = int(input("Cantidad inicial de stock: "))
+
   moneda_ars: Optional[Moneda] = next(
     (m for m in repo_moneda.leer_todos() if m.codigo == "ARS"),
+    None,
+  )
+  moneda_usd: Optional[Moneda] = next(
+    (m for m in repo_moneda.leer_todos() if m.codigo == "USD"),
     None,
   )
 
@@ -159,8 +165,10 @@ def menu_libros(
     autor=autor,
     editorial=editorial,
     genero=genero,
-    precio_ars=precio,
+    precio_ars=precio_ars,
+    precio_usd=precio_usd,
     moneda_ars=moneda_ars,
+    moneda_usd=moneda_usd,
     cantidad_inicial=cantidad,
   )
   print(f"Creado: {nuevo}")
@@ -169,34 +177,37 @@ def menu_libros(
 def menu_precios(
   servicio_precio: ServicioPrecio,
   repo_precio: RepositorioPrecio,
+  repo_libro: RepositorioLibro,
   repo_tipo: RepositorioTipoCotizacion,
 ) -> None:
-  """Lista los precios y permite consultar su valor en USD."""
-  print("\n--- Listado de Precios ---")
+  """Lista los precios (ARS/USD) y sugiere actualización de ARS."""
+  print("\n--- Listado de Precios (ARS y USD) ---")
   for precio in repo_precio.leer_todos():
     print(f"  {precio}")
 
-  if not _confirmar_accion("\n¿Desea consultar un precio en USD?"):
+  if not _confirmar_accion(
+    "\n¿Desea ver la sugerencia de precio ARS según cotización?"
+  ):
     print("Operación cancelada.")
     return
 
+  for l in repo_libro.leer_todos():
+    print(f"  [{l.id}] {l.titulo}")
   libro_id: int = int(input("ID de libro: "))
-  tipos = repo_tipo.leer_todos()
-  for t in tipos:
+
+  for t in repo_tipo.leer_todos():
     print(f"  [{t.id}] {t.nombre}")
   tipo_id: int = int(input("ID de tipo de cotización: "))
 
-  precios = servicio_precio.precios_de_libro(libro_id)
-  if not precios:
-    print("El libro no tiene precios registrados.")
-    return
   try:
-    en_usd: float = servicio_precio.convertir_a_usd(
-      precios[0].monto, tipo_id
+    actual, sugerido, diferencia = (
+      servicio_precio.comparar_ars_vs_sugerido(libro_id, tipo_id)
     )
-    print(f"Precio en USD: ${en_usd}")
+    print(f"\nPrecio ARS actual: ${actual}")
+    print(f"Precio ARS sugerido: ${sugerido}")
+    print(f"Diferencia: ${diferencia}")
   except ValueError as error:
-    print(f"No se pudo convertir: {error}")
+    print(f"No se pudo calcular: {error}")
 
 
 def menu_stock(
@@ -230,22 +241,54 @@ def menu_stock(
 def menu_cotizaciones(
   servicio_cotizacion: ServicioCotizacion,
   repo_cotizacion: RepositorioCotizacionDolar,
+  repo_tipo: RepositorioTipoCotizacion,
 ) -> None:
-  """Lista las cotizaciones y actualiza el histórico desde la API."""
+  """Lista cotizaciones y registra una nueva (API o manual)."""
   print("\n--- Listado de Cotizaciones ---")
   for cot in repo_cotizacion.leer_todos():
     print(f"  {cot}")
 
   if not _confirmar_accion(
-    "\n¿Desea actualizar cotizaciones desde DolarAPI?"
+    "\n¿Desea registrar una nueva cotización?"
   ):
     print("Operación cancelada.")
     return
 
-  nuevas = servicio_cotizacion.actualizar_cotizaciones()
-  print(f"Cotizaciones nuevas agregadas: {len(nuevas)}")
-  for cot in nuevas:
-    print(f"  {cot}")
+  for t in repo_tipo.leer_todos():
+    print(f"  [{t.id}] {t.nombre}")
+  tipo_id: int = int(input("ID de tipo de cotización: "))
+
+  tipo: Optional[TipoCotizacion] = repo_tipo.leer_por_id(tipo_id)
+  if tipo is None:
+    print(f"No existe el tipo id={tipo_id}.")
+    return
+
+  print(f"Consultando cotización real para \"{tipo.nombre}\"...")
+  resultado = servicio_cotizacion.obtener_cotizacion_automatica(
+    tipo.nombre
+  )
+
+  if resultado is not None:
+    valor_compra, valor_venta = resultado
+    print(
+      f"Cotización obtenida automáticamente: "
+      f"compra ${valor_compra}, venta ${valor_venta}"
+    )
+  else:
+    print(
+      "No se pudo obtener la cotización automáticamente.\n"
+      "Ingrese los valores manualmente:"
+    )
+    valor_compra = float(input("Valor de compra (ARS): "))
+    valor_venta = float(input("Valor de venta (ARS): "))
+
+  try:
+    nueva = servicio_cotizacion.registrar_cotizacion(
+      tipo_id, valor_compra, valor_venta
+    )
+    print(f"Registrada: {nueva}")
+  except ValueError as error:
+    print(f"Error: {error}")
 
 
 def reporte_bajo_stock(
@@ -259,20 +302,22 @@ def reporte_bajo_stock(
 
 def reporte_comparacion_competencia(
   servicio_comparacion: ServicioComparacionCompetencia,
+  servicio_precio: ServicioPrecio,
   repo_libro: RepositorioLibro,
-  repo_precio: RepositorioPrecio,
 ) -> None:
-  """Compara los precios propios contra los de la competencia."""
+  """Compara los precios propios (ARS y USD) contra Cúspide."""
   print("\n--- Reporte: Comparación con la Competencia ---")
   for libro in repo_libro.leer_todos():
-    precios = [
-      p for p in repo_precio.leer_todos()
-      if p.libro.id == libro.id
-    ]
-    if not precios:
+    precio_ars = servicio_precio.precio_por_moneda(
+      libro.id, "ARS"
+    )
+    precio_usd = servicio_precio.precio_por_moneda(
+      libro.id, "USD"
+    )
+    if precio_ars is None or precio_usd is None:
       continue
     resultado: str = servicio_comparacion.comparar(
-      libro.isbn, precios[0].monto
+      libro.isbn, precio_ars.monto, precio_usd.monto
     )
     print(f"  {libro.titulo}: {resultado}")
 
@@ -280,7 +325,7 @@ def reporte_comparacion_competencia(
 def reporte_catalogo(
   servicio_reportes: ServicioReportes,
 ) -> None:
-  """Muestra el catálogo completo con precio y stock."""
+  """Muestra el catálogo completo con precios (ARS/USD) y stock."""
   print("\n--- Reporte: Catálogo Completo ---")
   for item in servicio_reportes.catalogo_completo():
     libro: Libro = item["libro"]
