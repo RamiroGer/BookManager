@@ -188,7 +188,7 @@ class Libro(EntidadBase):
   def __repr__(self) -> str:
     return (
       f"Libro(id={self.id}, isbn={self.isbn!r}, "
-      f"titulo={self.titulo!r})"
+      f"titulo={self.titulo!r}, autor={self.autor!r})"
     )
 
 
