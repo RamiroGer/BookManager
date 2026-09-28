@@ -6,7 +6,7 @@ import json
 import os
 import urllib.request
 from datetime import date
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from book_manager.entities.entities import (
   CotizacionDolar,
@@ -29,15 +29,21 @@ from book_manager.repositories.repositories import (
   RepositorioTipoCotizacion,
 )
 
-URL_API_DOLAR: str = "https://dolarapi.com/v1/dolares"
 RUTA_COMPETENCIA: str = os.path.join(
   os.path.dirname(__file__),
   "..", "migrations", "csv", "competencia.csv",
 )
 
+URL_API_DOLAR: str = "https://dolarapi.com/v1/dolares"
+
 
 class ServicioCotizacion:
-  """Obtiene y persiste cotizaciones del dólar en tiempo real."""
+  """Gestiona el registro de cotizaciones del dólar en tiempo real.
+
+  Intenta obtener la cotización vigente desde una API pública; si
+  la consulta falla (sin conexión, servicio caído, etc.), permite
+  el registro manual como respaldo, sin interrumpir el sistema.
+  """
 
   def __init__(
     self,
@@ -47,49 +53,51 @@ class ServicioCotizacion:
     self._repo_cotizacion = repo_cotizacion
     self._repo_tipo = repo_tipo
 
-  def obtener_cotizaciones_actuales(self) -> List[Dict]:
-    """Consulta la API pública y retorna las cotizaciones vigentes."""
+  def obtener_cotizacion_automatica(
+    self, nombre_tipo: str
+  ) -> Optional[Tuple[float, float]]:
+    """Intenta traer la cotización vigente desde la API pública."""
+    peticion = urllib.request.Request(
+      URL_API_DOLAR,
+      headers={"User-Agent": "Mozilla/5.0"},
+    )
     try:
       with urllib.request.urlopen(
-        URL_API_DOLAR, timeout=10
+        peticion, timeout=5
       ) as respuesta:
-        return json.loads(respuesta.read())
-    except Exception as error:
-      print(f"No se pudo consultar la cotización: {error}")
-      return []
+        datos: List[Dict] = json.loads(respuesta.read())
+      for item in datos:
+        if str(item.get("nombre", "")).lower() == (
+          nombre_tipo.lower()
+        ):
+          compra: float = float(item.get("compra", 0.0) or 0.0)
+          venta: float = float(item.get("venta", 0.0) or 0.0)
+          return compra, venta
+      return None
+    except Exception:
+      return None
 
-  def actualizar_cotizaciones(self) -> List[CotizacionDolar]:
-    """Actualiza el histórico de cotizaciones desde la API."""
-    datos: List[Dict] = self.obtener_cotizaciones_actuales()
-    hoy: date = date.today()
-    actualizadas: List[CotizacionDolar] = []
-
-    for item in datos:
-      nombre_tipo: str = str(item.get("nombre", "Desconocido"))
-      tipo: TipoCotizacion = self._buscar_o_crear_tipo(
-        nombre_tipo
-      )
-      existente = self._repo_cotizacion.leer_por_tipo_y_fecha(
-        tipo.id, hoy
-      )
-      if existente:
-        continue
-      cotizacion: CotizacionDolar = CotizacionDolar(
-        tipo=tipo,
-        fecha=hoy,
-        valor_compra=float(item.get("compra", 0.0) or 0.0),
-        valor_venta=float(item.get("venta", 0.0) or 0.0),
-      )
-      self._repo_cotizacion.crear(cotizacion)
-      actualizadas.append(cotizacion)
-
-    return actualizadas
-
-  def _buscar_o_crear_tipo(self, nombre: str) -> TipoCotizacion:
-    for tipo in self._repo_tipo.leer_todos():
-      if tipo.nombre.lower() == nombre.lower():
-        return tipo
-    return self._repo_tipo.crear(TipoCotizacion(nombre=nombre))
+  def registrar_cotizacion(
+    self,
+    tipo_id: int,
+    valor_compra: float,
+    valor_venta: float,
+    fecha: Optional[str] = None,
+  ) -> CotizacionDolar:
+    """Registra una nueva cotización para un tipo dado."""
+    tipo: Optional[TipoCotizacion] = self._repo_tipo.leer_por_id(
+      tipo_id
+    )
+    if tipo is None:
+      raise ValueError(f"No existe el tipo id={tipo_id}.")
+    fecha_real: str = fecha or date.today().isoformat()
+    cotizacion: CotizacionDolar = CotizacionDolar(
+      tipo=tipo,
+      fecha=fecha_real,
+      valor_compra=valor_compra,
+      valor_venta=valor_venta,
+    )
+    return self._repo_cotizacion.crear(cotizacion)
 
   def obtener_ultima_cotizacion(
     self, tipo_id: int
@@ -104,7 +112,7 @@ class ServicioCotizacion:
 
 
 class ServicioPrecio:
-  """Gestiona la conversión y consulta de precios de libros."""
+  """Gestiona los precios de libros en ARS y USD."""
 
   def __init__(
     self,
@@ -116,25 +124,54 @@ class ServicioPrecio:
     self._repo_moneda = repo_moneda
     self._servicio_cotizacion = servicio_cotizacion
 
-  def convertir_a_usd(
-    self, monto_ars: float, tipo_cotizacion_id: int
-  ) -> float:
-    """Convierte un monto en ARS a USD según la cotización."""
-    cotizacion: Optional[CotizacionDolar] = (
-      self._servicio_cotizacion.obtener_ultima_cotizacion(
-        tipo_cotizacion_id
-      )
-    )
-    if cotizacion is None or cotizacion.valor_venta == 0:
-      raise ValueError("No hay cotización disponible.")
-    return round(monto_ars / cotizacion.valor_venta, 2)
-
   def precios_de_libro(self, libro_id: int) -> List[Precio]:
     """Retorna todos los precios registrados para un libro."""
     return [
       p for p in self._repo_precio.leer_todos()
       if p.libro.id == libro_id
     ]
+
+  def precio_por_moneda(
+    self, libro_id: int, codigo_moneda: str
+  ) -> Optional[Precio]:
+    """Retorna el precio de un libro en una moneda específica."""
+    for precio in self.precios_de_libro(libro_id):
+      if precio.moneda.codigo == codigo_moneda.upper():
+        return precio
+    return None
+
+  def sugerir_precio_ars(
+    self, libro_id: int, tipo_cotizacion_id: int
+  ) -> float:
+    """Sugiere el precio ARS según el precio USD y la cotización."""
+    precio_usd: Optional[Precio] = self.precio_por_moneda(
+      libro_id, "USD"
+    )
+    if precio_usd is None:
+      raise ValueError("El libro no tiene precio en USD.")
+    cotizacion: Optional[CotizacionDolar] = (
+      self._servicio_cotizacion.obtener_ultima_cotizacion(
+        tipo_cotizacion_id
+      )
+    )
+    if cotizacion is None:
+      raise ValueError("No hay cotización registrada.")
+    return round(precio_usd.monto * cotizacion.valor_venta, 2)
+
+  def comparar_ars_vs_sugerido(
+    self, libro_id: int, tipo_cotizacion_id: int
+  ) -> Tuple[float, float, float]:
+    """Compara el precio ARS actual contra el sugerido por USD."""
+    precio_ars: Optional[Precio] = self.precio_por_moneda(
+      libro_id, "ARS"
+    )
+    if precio_ars is None:
+      raise ValueError("El libro no tiene precio en ARS.")
+    sugerido: float = self.sugerir_precio_ars(
+      libro_id, tipo_cotizacion_id
+    )
+    diferencia: float = round(sugerido - precio_ars.monto, 2)
+    return precio_ars.monto, sugerido, diferencia
 
 
 class ServicioStock:
@@ -191,10 +228,12 @@ class ServicioLibro:
     editorial: Editorial,
     genero: Genero,
     precio_ars: float,
+    precio_usd: float,
     moneda_ars: Moneda,
+    moneda_usd: Moneda,
     cantidad_inicial: int,
   ) -> Libro:
-    """Crea un libro con su precio inicial y stock asociado."""
+    """Crea un libro con precios en ARS y USD, y stock asociado."""
     libro: Libro = self._repo_libro.crear(
       Libro(
         isbn=isbn,
@@ -206,6 +245,9 @@ class ServicioLibro:
     )
     self._repo_precio.crear(
       Precio(libro=libro, moneda=moneda_ars, monto=precio_ars)
+    )
+    self._repo_precio.crear(
+      Precio(libro=libro, moneda=moneda_usd, monto=precio_usd)
     )
     self._repo_stock.crear(
       Stock(libro=libro, cantidad=cantidad_inicial)
@@ -221,35 +263,55 @@ class ServicioLibro:
 
 
 class ServicioComparacionCompetencia:
-  """Compara precios propios contra precios de referencia."""
+  """Compara precios propios (ARS y USD) contra la competencia."""
 
   def __init__(self, repo_libro: RepositorioLibro) -> None:
     self._repo_libro = repo_libro
 
-  def _cargar_precios_competencia(self) -> Dict[str, float]:
-    precios: Dict[str, float] = {}
+  def _cargar_precios_competencia(
+    self,
+  ) -> Dict[str, Tuple[float, float]]:
+    precios: Dict[str, Tuple[float, float]] = {}
     if not os.path.exists(RUTA_COMPETENCIA):
       return precios
     with open(
       RUTA_COMPETENCIA, "r", newline="", encoding="utf-8"
     ) as f:
       for fila in csv.DictReader(f):
-        precios[fila["isbn"]] = float(fila["precio_ars"])
+        precios[fila["isbn"]] = (
+          float(fila["precio_ars"]),
+          float(fila["precio_usd"]),
+        )
     return precios
 
-  def comparar(self, isbn: str, precio_propio: float) -> str:
-    """Compara un precio propio contra el de la competencia."""
-    precios: Dict[str, float] = (
+  def comparar(
+    self, isbn: str, precio_propio_ars: float,
+    precio_propio_usd: float,
+  ) -> str:
+    """Compara los precios propios (ARS y USD) contra Cúspide."""
+    precios: Dict[str, Tuple[float, float]] = (
       self._cargar_precios_competencia()
     )
     if isbn not in precios:
       return "Sin datos de competencia."
-    precio_comp: float = precios[isbn]
-    if precio_propio < precio_comp:
-      return f"Más barato que Cúspide (${precio_comp})."
-    if precio_propio > precio_comp:
-      return f"Más caro que Cúspide (${precio_comp})."
-    return "Mismo precio que Cúspide."
+    precio_comp_ars, precio_comp_usd = precios[isbn]
+    resultado_ars: str = self._comparar_monto(
+      precio_propio_ars, precio_comp_ars, "ARS"
+    )
+    resultado_usd: str = self._comparar_monto(
+      precio_propio_usd, precio_comp_usd, "USD"
+    )
+    return f"{resultado_ars} | {resultado_usd}"
+
+  def _comparar_monto(
+    self, propio: float, competencia: float, moneda: str
+  ) -> str:
+    """Compara un monto propio contra el de la competencia."""
+    if propio < competencia:
+      return f"{moneda}: más barato (Cúspide ${competencia})"
+    if propio > competencia:
+      return f"{moneda}: más caro (Cúspide ${competencia})"
+    return f"{moneda}: igual precio"
 
 
 class ServicioReportes:
@@ -273,7 +335,7 @@ class ServicioReportes:
     ]
 
   def catalogo_completo(self) -> List[Dict[str, object]]:
-    """Retorna un resumen de cada libro con precio y stock."""
+    """Retorna un resumen de cada libro con precios (ARS/USD)."""
     resumen: List[Dict[str, object]] = []
     for libro in self._repo_libro.leer_todos():
       precios: List[Precio] = (
