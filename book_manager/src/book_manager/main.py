@@ -88,6 +88,7 @@ def main(import_default_data: bool = True) -> None:
       repo_moneda,
       repo_tipo,
       servicio_libro,
+      servicio_cotizacion,
     )
 
   while True:
@@ -108,16 +109,20 @@ def main(import_default_data: bool = True) -> None:
         repo_genero, repo_moneda,
       )
     elif opcion == "6":
-      menu_precios(servicio_precio, repo_precio, repo_tipo)
+      menu_precios(
+        servicio_precio, repo_precio, repo_libro, repo_tipo
+      )
     elif opcion == "7":
       menu_stock(servicio_stock, repo_stock)
     elif opcion == "8":
-      menu_cotizaciones(servicio_cotizacion, repo_cotizacion)
+      menu_cotizaciones(
+        servicio_cotizacion, repo_cotizacion, repo_tipo
+      )
     elif opcion == "9":
       reporte_bajo_stock(servicio_reportes)
     elif opcion == "10":
       reporte_comparacion_competencia(
-        servicio_comparacion, repo_libro, repo_precio
+        servicio_comparacion, servicio_precio, repo_libro
       )
     elif opcion == "11":
       reporte_catalogo(servicio_reportes)
