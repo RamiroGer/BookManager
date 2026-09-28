@@ -279,8 +279,8 @@ class ServicioComparacionCompetencia:
     ) as f:
       for fila in csv.DictReader(f):
         precios[fila["isbn"]] = (
-          float(fila["precio_ars"]),
-          float(fila["precio_usd"]),
+          float(fila.get("precio_ars", 0.0) or 0.0),
+          float(fila.get("precio_usd", 0.0) or 0.0),
         )
     return precios
 
