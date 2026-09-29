@@ -90,13 +90,18 @@ class ServicioCotizacion:
     )
     if tipo is None:
       raise ValueError(f"No existe el tipo id={tipo_id}.")
-    fecha_real: str = fecha or date.today().isoformat()
-    cotizacion: CotizacionDolar = CotizacionDolar(
-      tipo=tipo,
-      fecha=fecha_real,
-      valor_compra=valor_compra,
-      valor_venta=valor_venta,
-    )
+    fecha_real: date = (
+    date.fromisoformat(fecha)
+    if fecha
+    else date.today()
+)
+
+cotizacion: CotizacionDolar = CotizacionDolar(
+    tipo=tipo,
+    fecha=fecha_real,
+    valor_compra=valor_compra,
+    valor_venta=valor_venta,
+)
     return self._repo_cotizacion.crear(cotizacion)
 
   def obtener_ultima_cotizacion(
