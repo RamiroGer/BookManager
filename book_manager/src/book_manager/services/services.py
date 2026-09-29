@@ -77,32 +77,26 @@ class ServicioCotizacion:
     except Exception:
       return None
 
-     def registrar_cotizacion(
+  def registrar_cotizacion(
     self,
     tipo_id: int,
     valor_compra: float,
     valor_venta: float,
     fecha: Optional[str] = None,
-  ) -> CotizacionDolar: """Registra una nueva cotización para un tipo dado."""
+  ) -> CotizacionDolar:
+    """Registra una nueva cotización para un tipo dado."""
     tipo: Optional[TipoCotizacion] = self._repo_tipo.leer_por_id(
       tipo_id
     )
     if tipo is None:
       raise ValueError(f"No existe el tipo id={tipo_id}.")
-
-    fecha_real: date = (
-      date.fromisoformat(fecha)
-      if fecha
-      else date.today()
-    )
-
+    fecha_real: str = fecha or date.today().isoformat()
     cotizacion: CotizacionDolar = CotizacionDolar(
       tipo=tipo,
       fecha=fecha_real,
       valor_compra=valor_compra,
       valor_venta=valor_venta,
     )
-
     return self._repo_cotizacion.crear(cotizacion)
 
   def obtener_ultima_cotizacion(
