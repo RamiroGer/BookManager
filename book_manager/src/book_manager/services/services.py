@@ -77,14 +77,13 @@ class ServicioCotizacion:
     except Exception:
       return None
 
-    def registrar_cotizacion(
+     def registrar_cotizacion(
     self,
     tipo_id: int,
     valor_compra: float,
     valor_venta: float,
     fecha: Optional[str] = None,
-  ) -> CotizacionDolar:
-    """Registra una nueva cotización para un tipo dado."""
+  ) -> CotizacionDolar: """Registra una nueva cotización para un tipo dado."""
     tipo: Optional[TipoCotizacion] = self._repo_tipo.leer_por_id(
       tipo_id
     )
