@@ -327,5 +327,5 @@ class CotizacionDolar(EntidadBase):
   def __repr__(self) -> str:
     return (
       f"CotizacionDolar(tipo={self.tipo.nombre!r}, "
-      f"fecha={self.fecha.isoformat()!r}, venta={self.valor_venta})"
+      f"fecha={self.fecha!r}, venta={self.valor_venta})"
     )
