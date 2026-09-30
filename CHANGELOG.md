@@ -2,6 +2,11 @@
 
 Los cambios más recientes aparecen primero.
 
+## [Ejercicio 04]
+- ServicioCotizacion: registro y consulta de cotizaciones cargadas manualmente.
+- ServicioPrecio: precio ARS sugerido a partir del precio USD y la cotización.
+- ServicioStock, ServicioLibro y ServicioReportes.
+
 ## [Ejercicio 03]
 - Interfaz IRepositorio (Generic, ABC) definida.
 - RepositorioCSVBase con persistencia genérica.
