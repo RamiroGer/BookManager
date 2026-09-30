@@ -2,6 +2,11 @@
 
 Los cambios más recientes aparecen primero.
 
+## [Ejercicio 06 - Fix 4]
+- aplicar_precio_ars agregado a ServicioPrecio.
+- menu_precios ahora resuelve la cotización faltante (pidiéndola por consola) antes de sugerir.
+- Opción de aplicar el precio sugerido al libro directamente desde el menú.
+
 ## [Ejercicio 06 - Fix 3]
 - Comparación con competencia (Cúspide) deshabilitada y comentada: requiere web scraping (Tema 9, no visto).
 - Opción de menú y reporte correspondiente removidos de main.py y console.py.
