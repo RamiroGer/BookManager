@@ -2,6 +2,12 @@
 
 Los cambios más recientes aparecen primero.
 
+## [Ejercicio 06 - Fix 5]
+- Consulta automática a la API del dólar (DolarAPI) deshabilitada y comentada: la consigna pide trabajar sin API.
+- services.py: comentados obtener_cotizacion_automatica, URL_API_DOLAR y los imports json / urllib.request.
+- console.py: menu_cotizaciones y menu_precios piden la cotización manualmente; el código de la API quedó comentado.
+- README.md y textos del notebook actualizados (sin API ni scraping).
+
 ## [Ejercicio 06 - Fix 4]
 - aplicar_precio_ars agregado a ServicioPrecio.
 - menu_precios ahora resuelve la cotización faltante (pidiéndola por consola) antes de sugerir.
