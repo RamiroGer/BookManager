@@ -2,6 +2,13 @@
 
 Los cambios más recientes aparecen primero.
 
+## [Ejercicio 06 - Fix 1]
+- Confirmación (s/n) agregada antes de cada alta.
+- Campo autor hecho opcional (default 'Desconocido').
+- __repr__ de Libro actualizado para mostrar el autor.
+- Validación de IDs inexistentes al dar de alta un libro.
+- CSVs limpiados de registros de prueba corruptos.
+
 ## [Ejercicio 06]
 - Menús de consola para las 8 entidades.
 - Reportes: bajo stock y catálogo completo.
