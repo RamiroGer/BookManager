@@ -2,6 +2,10 @@
 
 Los cambios más recientes aparecen primero.
 
+## [Ejercicio 07]
+- main.py con menú principal y composición de dependencias.
+- Carga automática de datos iniciales si el repositorio está vacío.
+
 ## [Ejercicio 06 - Fix 1]
 - Confirmación (s/n) agregada antes de cada alta.
 - Campo autor hecho opcional (default 'Desconocido').
