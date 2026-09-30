@@ -1,7 +1,7 @@
 """Servicios de lógica de negocio para Book Manager."""
 from __future__ import annotations
 
-import csv
+# import csv  # solo usado por ServicioComparacionCompetencia (deshabilitada)
 import json
 import os
 import urllib.request
@@ -29,10 +29,12 @@ from book_manager.repositories.repositories import (
   RepositorioTipoCotizacion,
 )
 
-RUTA_COMPETENCIA: str = os.path.join(
-  os.path.dirname(__file__),
-  "..", "migrations", "csv", "competencia.csv",
-)
+# RUTA_COMPETENCIA: solo usada por ServicioComparacionCompetencia
+# (deshabilitada, ver más abajo)
+# RUTA_COMPETENCIA: str = os.path.join(
+#   os.path.dirname(__file__),
+#   "..", "migrations", "csv", "competencia.csv",
+# )
 
 URL_API_DOLAR: str = "https://dolarapi.com/v1/dolares"
 
@@ -262,56 +264,60 @@ class ServicioLibro:
     ]
 
 
-class ServicioComparacionCompetencia:
-  """Compara precios propios (ARS y USD) contra la competencia."""
-
-  def __init__(self, repo_libro: RepositorioLibro) -> None:
-    self._repo_libro = repo_libro
-
-  def _cargar_precios_competencia(
-    self,
-  ) -> Dict[str, Tuple[float, float]]:
-    precios: Dict[str, Tuple[float, float]] = {}
-    if not os.path.exists(RUTA_COMPETENCIA):
-      return precios
-    with open(
-      RUTA_COMPETENCIA, "r", newline="", encoding="utf-8"
-    ) as f:
-      for fila in csv.DictReader(f):
-        precios[fila["isbn"]] = (
-          float(fila.get("precio_ars", 0.0) or 0.0),
-          float(fila.get("precio_usd", 0.0) or 0.0),
-        )
-    return precios
-
-  def comparar(
-    self, isbn: str, precio_propio_ars: float,
-    precio_propio_usd: float,
-  ) -> str:
-    """Compara los precios propios (ARS y USD) contra Cúspide."""
-    precios: Dict[str, Tuple[float, float]] = (
-      self._cargar_precios_competencia()
-    )
-    if isbn not in precios:
-      return "Sin datos de competencia."
-    precio_comp_ars, precio_comp_usd = precios[isbn]
-    resultado_ars: str = self._comparar_monto(
-      precio_propio_ars, precio_comp_ars, "ARS"
-    )
-    resultado_usd: str = self._comparar_monto(
-      precio_propio_usd, precio_comp_usd, "USD"
-    )
-    return f"{resultado_ars} | {resultado_usd}"
-
-  def _comparar_monto(
-    self, propio: float, competencia: float, moneda: str
-  ) -> str:
-    """Compara un monto propio contra el de la competencia."""
-    if propio < competencia:
-      return f"{moneda}: más barato (Cúspide ${competencia})"
-    if propio > competencia:
-      return f"{moneda}: más caro (Cúspide ${competencia})"
-    return f"{moneda}: igual precio"
+# DESHABILITADO: la comparación con la competencia (Cúspide)
+# implica técnicas de web scraping (Tema 9), que todavía no
+# se vio en la cursada. Se deja comentado para uso futuro.
+#
+# class ServicioComparacionCompetencia:
+#   """Compara precios propios (ARS y USD) contra la competencia."""
+#
+#   def __init__(self, repo_libro: RepositorioLibro) -> None:
+#     self._repo_libro = repo_libro
+#
+#   def _cargar_precios_competencia(
+#     self,
+#   ) -> Dict[str, Tuple[float, float]]:
+#     precios: Dict[str, Tuple[float, float]] = {}
+#     if not os.path.exists(RUTA_COMPETENCIA):
+#       return precios
+#     with open(
+#       RUTA_COMPETENCIA, "r", newline="", encoding="utf-8"
+#     ) as f:
+#       for fila in csv.DictReader(f):
+#         precios[fila["isbn"]] = (
+#           float(fila.get("precio_ars", 0.0) or 0.0),
+#           float(fila.get("precio_usd", 0.0) or 0.0),
+#         )
+#     return precios
+#
+#   def comparar(
+#     self, isbn: str, precio_propio_ars: float,
+#     precio_propio_usd: float,
+#   ) -> str:
+#     """Compara los precios propios (ARS y USD) contra Cúspide."""
+#     precios: Dict[str, Tuple[float, float]] = (
+#       self._cargar_precios_competencia()
+#     )
+#     if isbn not in precios:
+#       return "Sin datos de competencia."
+#     precio_comp_ars, precio_comp_usd = precios[isbn]
+#     resultado_ars: str = self._comparar_monto(
+#       precio_propio_ars, precio_comp_ars, "ARS"
+#     )
+#     resultado_usd: str = self._comparar_monto(
+#       precio_propio_usd, precio_comp_usd, "USD"
+#     )
+#     return f"{resultado_ars} | {resultado_usd}"
+#
+#   def _comparar_monto(
+#     self, propio: float, competencia: float, moneda: str
+#   ) -> str:
+#     """Compara un monto propio contra el de la competencia."""
+#     if propio < competencia:
+#       return f"{moneda}: más barato (Cúspide ${competencia})"
+#     if propio > competencia:
+#       return f"{moneda}: más caro (Cúspide ${competencia})"
+#     return f"{moneda}: igual precio"
 
 
 class ServicioReportes:
