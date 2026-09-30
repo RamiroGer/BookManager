@@ -2,6 +2,11 @@
 
 Los cambios más recientes aparecen primero.
 
+## [Ejercicio 03]
+- Interfaz IRepositorio (Generic, ABC) definida.
+- RepositorioCSVBase con persistencia genérica.
+- Repositorios CRUD para las 8 entidades.
+
 ## [Ejercicio 02]
 - Entidades definidas: Genero, Editorial, Moneda, TipoCotizacion, Libro, Precio, Stock, CotizacionDolar.
 - Encapsulación aplicada mediante properties.
