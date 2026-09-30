@@ -15,7 +15,7 @@ from book_manager.repositories.repositories import (
   RepositorioTipoCotizacion,
 )
 from book_manager.services.services import (
-  # ServicioComparacionCompetencia,  # deshabilitada (Tema 9)
+  ServicioComparacionCompetencia,
   ServicioCotizacion,
   ServicioLibro,
   ServicioPrecio,
@@ -33,7 +33,7 @@ from book_manager.ui.console import (
   menu_tipos_cotizacion,
   reporte_bajo_stock,
   reporte_catalogo,
-  # reporte_comparacion_competencia,  # deshabilitada (Tema 9)
+  reporte_comparacion_competencia,
 )
 
 OPCIONES_MENU: str = """
@@ -47,7 +47,8 @@ OPCIONES_MENU: str = """
 7) Stock
 8) Cotizaciones del Dólar
 9) Reporte: Bajo Stock
-10) Reporte: Catálogo Completo
+10) Reporte: Comparación con Competencia
+11) Reporte: Catálogo Completo
 0) Salir
 ========================="""
 
@@ -73,9 +74,9 @@ def main(import_default_data: bool = True) -> None:
   servicio_libro = ServicioLibro(
     repo_libro, repo_precio, repo_stock
   )
-  # servicio_comparacion = ServicioComparacionCompetencia(
-  #   repo_libro
-  # )  # deshabilitada (Tema 9)
+  servicio_comparacion = ServicioComparacionCompetencia(
+    repo_libro
+  )
   servicio_reportes = ServicioReportes(
     repo_libro, repo_stock, servicio_precio
   )
@@ -119,11 +120,11 @@ def main(import_default_data: bool = True) -> None:
       )
     elif opcion == "9":
       reporte_bajo_stock(servicio_reportes)
-    # elif opcion == "10":  # deshabilitada (Tema 9, web scraping)
-    #   reporte_comparacion_competencia(
-    #     servicio_comparacion, servicio_precio, repo_libro
-    #   )
     elif opcion == "10":
+      reporte_comparacion_competencia(
+        servicio_comparacion, servicio_precio, repo_libro
+      )
+    elif opcion == "11":
       reporte_catalogo(servicio_reportes)
     elif opcion == "0":
       print("Saliendo del sistema. ¡Hasta luego!")
