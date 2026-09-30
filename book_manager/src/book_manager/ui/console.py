@@ -1,7 +1,7 @@
 """Interfaz de consola (CLI) para el sistema Book Manager."""
 from __future__ import annotations
 
-from typing import Optional
+from typing import Optional, Tuple
 
 from book_manager.entities.entities import (
   Editorial, Genero, Libro, Moneda, TipoCotizacion,
@@ -174,6 +174,13 @@ def menu_libros(
   print(f"Creado: {nuevo}")
 
 
+def _pedir_cotizacion_manual() -> Tuple[float, float]:
+  """Pide por consola los valores de compra y venta (ARS)."""
+  valor_compra: float = float(input("Valor de compra (ARS): "))
+  valor_venta: float = float(input("Valor de venta (ARS): "))
+  return valor_compra, valor_venta
+
+
 def _obtener_o_cargar_cotizacion(
   servicio_cotizacion: ServicioCotizacion,
   tipo: TipoCotizacion,
@@ -186,24 +193,27 @@ def _obtener_o_cargar_cotizacion(
     return
 
   print(f"No hay cotización registrada para \"{tipo.nombre}\".")
-  print("Consultando cotización real...")
-  resultado = servicio_cotizacion.obtener_cotizacion_automatica(
-    tipo.nombre
-  )
+  print("Ingrese los valores manualmente:")
+  valor_compra, valor_venta = _pedir_cotizacion_manual()
 
-  if resultado is not None:
-    valor_compra, valor_venta = resultado
-    print(
-      f"Cotización obtenida automáticamente: "
-      f"compra ${valor_compra}, venta ${valor_venta}"
-    )
-  else:
-    print(
-      "No se pudo obtener la cotización automáticamente.\n"
-      "Ingrese los valores manualmente:"
-    )
-    valor_compra = float(input("Valor de compra (ARS): "))
-    valor_venta = float(input("Valor de venta (ARS): "))
+  # DESHABILITADO: consulta automática a API (la consigna pide
+  # trabajar sin API). Se deja comentado para uso futuro.
+  # print("Consultando cotización real...")
+  # resultado = servicio_cotizacion.obtener_cotizacion_automatica(
+  #   tipo.nombre
+  # )
+  # if resultado is not None:
+  #   valor_compra, valor_venta = resultado
+  #   print(
+  #     f"Cotización obtenida automáticamente: "
+  #     f"compra ${valor_compra}, venta ${valor_venta}"
+  #   )
+  # else:
+  #   print(
+  #     "No se pudo obtener la cotización automáticamente.\n"
+  #     "Ingrese los valores manualmente:"
+  #   )
+  #   valor_compra, valor_venta = _pedir_cotizacion_manual()
 
   servicio_cotizacion.registrar_cotizacion(
     tipo.id, valor_compra, valor_venta
@@ -297,7 +307,7 @@ def menu_cotizaciones(
   repo_cotizacion: RepositorioCotizacionDolar,
   repo_tipo: RepositorioTipoCotizacion,
 ) -> None:
-  """Lista cotizaciones y registra una nueva (API o manual)."""
+  """Lista cotizaciones y registra una nueva (carga manual)."""
   print("\n--- Listado de Cotizaciones ---")
   for cot in repo_cotizacion.leer_todos():
     print(f"  {cot}")
@@ -317,24 +327,27 @@ def menu_cotizaciones(
     print(f"No existe el tipo id={tipo_id}.")
     return
 
-  print(f"Consultando cotización real para \"{tipo.nombre}\"...")
-  resultado = servicio_cotizacion.obtener_cotizacion_automatica(
-    tipo.nombre
-  )
+  print(f"Cotización para \"{tipo.nombre}\":")
+  valor_compra, valor_venta = _pedir_cotizacion_manual()
 
-  if resultado is not None:
-    valor_compra, valor_venta = resultado
-    print(
-      f"Cotización obtenida automáticamente: "
-      f"compra ${valor_compra}, venta ${valor_venta}"
-    )
-  else:
-    print(
-      "No se pudo obtener la cotización automáticamente.\n"
-      "Ingrese los valores manualmente:"
-    )
-    valor_compra = float(input("Valor de compra (ARS): "))
-    valor_venta = float(input("Valor de venta (ARS): "))
+  # DESHABILITADO: consulta automática a API (la consigna pide
+  # trabajar sin API). Se deja comentado para uso futuro.
+  # print(f"Consultando cotización real para \"{tipo.nombre}\"...")
+  # resultado = servicio_cotizacion.obtener_cotizacion_automatica(
+  #   tipo.nombre
+  # )
+  # if resultado is not None:
+  #   valor_compra, valor_venta = resultado
+  #   print(
+  #     f"Cotización obtenida automáticamente: "
+  #     f"compra ${valor_compra}, venta ${valor_venta}"
+  #   )
+  # else:
+  #   print(
+  #     "No se pudo obtener la cotización automáticamente.\n"
+  #     "Ingrese los valores manualmente:"
+  #   )
+  #   valor_compra, valor_venta = _pedir_cotizacion_manual()
 
   try:
     nueva = servicio_cotizacion.registrar_cotizacion(

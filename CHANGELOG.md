@@ -2,6 +2,10 @@
 
 Los cambios más recientes aparecen primero.
 
+## [Ejercicio 06]
+- Menús de consola para las 8 entidades.
+- Reportes: bajo stock y catálogo completo.
+
 ## [Ejercicio 05]
 - preload_data.py con datos de ejemplo (10+ registros por entidad).
 
