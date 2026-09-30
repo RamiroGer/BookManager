@@ -123,3 +123,8 @@
 - aplicar_precio_ars agregado a ServicioPrecio.
 - menu_precios ahora resuelve la cotización faltante (API o manual) antes de sugerir.
 - Opción de aplicar el precio sugerido al libro directamente desde el menú.
+
+## [Ejercicio 01]
+- Rama Sprint_1 creada.
+- Estructura de directorios del proyecto generada.
+- requirements.txt creado (sin dependencias externas).
