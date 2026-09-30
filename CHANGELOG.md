@@ -2,6 +2,11 @@
 
 Los cambios más recientes aparecen primero.
 
+## [Ejercicio 06 - Fix 3]
+- Comparación con competencia (Cúspide) deshabilitada y comentada: requiere web scraping (Tema 9, no visto).
+- Opción de menú y reporte correspondiente removidos de main.py y console.py.
+- CSVs de prueba limpiados de registros duplicados.
+
 ## [Ejercicio 06 - Fix 2]
 - Precios duales ARS/USD por libro, tal como los muestra Cúspide.
 - Corregida inconsistencia de tipos: 'fecha' mezclaba str y datetime.date entre archivos, unificado a str en entities.py, repositories.py y services.py.
