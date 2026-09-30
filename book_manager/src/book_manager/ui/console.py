@@ -174,19 +174,56 @@ def menu_libros(
   print(f"Creado: {nuevo}")
 
 
+def _obtener_o_cargar_cotizacion(
+  servicio_cotizacion: ServicioCotizacion,
+  tipo: TipoCotizacion,
+) -> None:
+  """Asegura que exista una cotización vigente para un tipo."""
+  cotizacion = servicio_cotizacion.obtener_ultima_cotizacion(
+    tipo.id
+  )
+  if cotizacion is not None:
+    return
+
+  print(f"No hay cotización registrada para \"{tipo.nombre}\".")
+  print("Consultando cotización real...")
+  resultado = servicio_cotizacion.obtener_cotizacion_automatica(
+    tipo.nombre
+  )
+
+  if resultado is not None:
+    valor_compra, valor_venta = resultado
+    print(
+      f"Cotización obtenida automáticamente: "
+      f"compra ${valor_compra}, venta ${valor_venta}"
+    )
+  else:
+    print(
+      "No se pudo obtener la cotización automáticamente.\n"
+      "Ingrese los valores manualmente:"
+    )
+    valor_compra = float(input("Valor de compra (ARS): "))
+    valor_venta = float(input("Valor de venta (ARS): "))
+
+  servicio_cotizacion.registrar_cotizacion(
+    tipo.id, valor_compra, valor_venta
+  )
+
+
 def menu_precios(
   servicio_precio: ServicioPrecio,
+  servicio_cotizacion: ServicioCotizacion,
   repo_precio: RepositorioPrecio,
   repo_libro: RepositorioLibro,
   repo_tipo: RepositorioTipoCotizacion,
 ) -> None:
-  """Lista los precios (ARS/USD) y sugiere actualización de ARS."""
+  """Lista precios (ARS/USD) y permite actualizar el ARS de un libro."""
   print("\n--- Listado de Precios (ARS y USD) ---")
   for precio in repo_precio.leer_todos():
     print(f"  {precio}")
 
   if not _confirmar_accion(
-    "\n¿Desea ver la sugerencia de precio ARS según cotización?"
+    "\n¿Desea actualizar el precio ARS de un libro?"
   ):
     print("Operación cancelada.")
     return
@@ -199,15 +236,32 @@ def menu_precios(
     print(f"  [{t.id}] {t.nombre}")
   tipo_id: int = int(input("ID de tipo de cotización: "))
 
+  tipo: Optional[TipoCotizacion] = repo_tipo.leer_por_id(tipo_id)
+  if tipo is None:
+    print(f"No existe el tipo id={tipo_id}.")
+    return
+
+  _obtener_o_cargar_cotizacion(servicio_cotizacion, tipo)
+
   try:
     actual, sugerido, diferencia = (
       servicio_precio.comparar_ars_vs_sugerido(libro_id, tipo_id)
     )
-    print(f"\nPrecio ARS actual: ${actual}")
-    print(f"Precio ARS sugerido: ${sugerido}")
-    print(f"Diferencia: ${diferencia}")
   except ValueError as error:
     print(f"No se pudo calcular: {error}")
+    return
+
+  print(f"\nPrecio ARS actual: ${actual}")
+  print(f"Precio ARS sugerido ({tipo.nombre}): ${sugerido}")
+  print(f"Diferencia: ${diferencia}")
+
+  if _confirmar_accion("\n¿Aplicar el precio sugerido al libro?"):
+    actualizado = servicio_precio.aplicar_precio_ars(
+      libro_id, sugerido
+    )
+    print(f"Precio actualizado: {actualizado}")
+  else:
+    print("Precio no aplicado.")
 
 
 def menu_stock(
