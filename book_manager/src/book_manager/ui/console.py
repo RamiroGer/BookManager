@@ -17,7 +17,7 @@ from book_manager.repositories.repositories import (
   RepositorioTipoCotizacion,
 )
 from book_manager.services.services import (
-  # ServicioComparacionCompetencia,  # deshabilitada
+  ServicioComparacionCompetencia,
   ServicioCotizacion,
   ServicioLibro,
   ServicioPrecio,
@@ -300,28 +300,26 @@ def reporte_bajo_stock(
     print(f"  {stock}")
 
 
-# DESHABILITADO: web scraping (Tema 9, no visto en la
-# cursada). Se deja comentado para habilitar más adelante.
-# def reporte_comparacion_competencia(
-#   servicio_comparacion: ServicioComparacionCompetencia,
-#   servicio_precio: ServicioPrecio,
-#   repo_libro: RepositorioLibro,
-# ) -> None:
-#   """Compara los precios propios (ARS y USD) contra Cúspide."""
-#   print("\n--- Reporte: Comparación con la Competencia ---")
-#   for libro in repo_libro.leer_todos():
-#     precio_ars = servicio_precio.precio_por_moneda(
-#       libro.id, "ARS"
-#     )
-#     precio_usd = servicio_precio.precio_por_moneda(
-#       libro.id, "USD"
-#     )
-#     if precio_ars is None or precio_usd is None:
-#       continue
-#     resultado: str = servicio_comparacion.comparar(
-#       libro.isbn, precio_ars.monto, precio_usd.monto
-#     )
-#     print(f"  {libro.titulo}: {resultado}")
+def reporte_comparacion_competencia(
+  servicio_comparacion: ServicioComparacionCompetencia,
+  servicio_precio: ServicioPrecio,
+  repo_libro: RepositorioLibro,
+) -> None:
+  """Compara los precios propios (ARS y USD) contra Cúspide."""
+  print("\n--- Reporte: Comparación con la Competencia ---")
+  for libro in repo_libro.leer_todos():
+    precio_ars = servicio_precio.precio_por_moneda(
+      libro.id, "ARS"
+    )
+    precio_usd = servicio_precio.precio_por_moneda(
+      libro.id, "USD"
+    )
+    if precio_ars is None or precio_usd is None:
+      continue
+    resultado: str = servicio_comparacion.comparar(
+      libro.isbn, precio_ars.monto, precio_usd.monto
+    )
+    print(f"  {libro.titulo}: {resultado}")
 
 
 def reporte_catalogo(
