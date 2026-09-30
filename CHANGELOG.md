@@ -2,6 +2,10 @@
 
 Los cambios más recientes aparecen primero.
 
+## [Ejercicio 06 - Fix 2]
+- Precios duales ARS/USD por libro, tal como los muestra Cúspide.
+- Corregida inconsistencia de tipos: 'fecha' mezclaba str y datetime.date entre archivos, unificado a str en entities.py, repositories.py y services.py.
+
 ## [Ejercicio 07]
 - main.py con menú principal y composición de dependencias.
 - Carga automática de datos iniciales si el repositorio está vacío.
