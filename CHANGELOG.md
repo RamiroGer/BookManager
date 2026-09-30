@@ -2,6 +2,9 @@
 
 Los cambios más recientes aparecen primero.
 
+## [Ejercicio 05]
+- preload_data.py con datos de ejemplo (10+ registros por entidad).
+
 ## [Ejercicio 04]
 - ServicioCotizacion: registro y consulta de cotizaciones cargadas manualmente.
 - ServicioPrecio: precio ARS sugerido a partir del precio USD y la cotización.
