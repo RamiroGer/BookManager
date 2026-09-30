@@ -175,6 +175,18 @@ class ServicioPrecio:
     diferencia: float = round(sugerido - precio_ars.monto, 2)
     return precio_ars.monto, sugerido, diferencia
 
+  def aplicar_precio_ars(
+    self, libro_id: int, monto_ars: float
+  ) -> Precio:
+    """Actualiza el precio en ARS vigente de un libro."""
+    precio_ars: Optional[Precio] = self.precio_por_moneda(
+      libro_id, "ARS"
+    )
+    if precio_ars is None:
+      raise ValueError("El libro no tiene precio en ARS.")
+    precio_ars.monto = monto_ars
+    return self._repo_precio.actualizar(precio_ars)
+
 
 class ServicioStock:
   """Gestiona el control de stock de libros."""
