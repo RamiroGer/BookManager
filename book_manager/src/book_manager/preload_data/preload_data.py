@@ -1,7 +1,7 @@
 """Carga de datos de ejemplo para el sistema Book Manager."""
 from __future__ import annotations
 
-import csv
+# import csv  # solo usado por _generar_csv_competencia (deshabilitada)
 import os
 from typing import Dict, List, Tuple
 
@@ -19,10 +19,12 @@ from book_manager.services.services import (
   ServicioCotizacion, ServicioLibro,
 )
 
-RUTA_COMPETENCIA: str = os.path.join(
-  os.path.dirname(__file__),
-  "..", "migrations", "csv", "competencia.csv",
-)
+# RUTA_COMPETENCIA: solo usada por _generar_csv_competencia,
+# deshabilitada (ver más abajo).
+# RUTA_COMPETENCIA: str = os.path.join(
+#   os.path.dirname(__file__),
+#   "..", "migrations", "csv", "competencia.csv",
+# )
 
 GENEROS: List[str] = [
   "Novela", "Ensayo", "Infantil", "Técnico", "Poesía",
@@ -80,19 +82,21 @@ LIBROS: List[Tuple] = [
    9, 9, 6500.0, 6.5),
 ]
 
-# Precios de referencia de la competencia (Cúspide): ARS y USD.
-COMPETENCIA: List[Tuple[str, float, float]] = [
-  ("978-1", 12500.0, 12.5),
-  ("978-2", 9200.0, 9.2),
-  ("978-3", 5800.0, 5.8),
-  ("978-4", 14500.0, 14.5),
-  ("978-5", 8900.0, 8.9),
-  ("978-6", 6800.0, 6.8),
-  ("978-7", 7500.0, 7.5),
-  ("978-8", 10500.0, 10.5),
-  ("978-9", 10200.0, 10.2),
-  ("978-10", 6200.0, 6.2),
-]
+# DESHABILITADO: comparación con competencia (web scraping,
+# Tema 9, no visto en la cursada). Se deja comentado.
+# # Precios de referencia de la competencia (Cúspide): ARS y USD.
+# COMPETENCIA: List[Tuple[str, float, float]] = [
+#   ("978-1", 12500.0, 12.5),
+#   ("978-2", 9200.0, 9.2),
+#   ("978-3", 5800.0, 5.8),
+#   ("978-4", 14500.0, 14.5),
+#   ("978-5", 8900.0, 8.9),
+#   ("978-6", 6800.0, 6.8),
+#   ("978-7", 7500.0, 7.5),
+#   ("978-8", 10500.0, 10.5),
+#   ("978-9", 10200.0, 10.2),
+#   ("978-10", 6200.0, 6.2),
+# ]
 
 
 def cargar_datos_iniciales(
@@ -151,17 +155,17 @@ def cargar_datos_iniciales(
       cantidad_inicial=10,
     )
 
-  _generar_csv_competencia()
+  # _generar_csv_competencia()  # deshabilitado (ver Tema 9)
   print("Datos iniciales cargados correctamente.")
 
 
-def _generar_csv_competencia() -> None:
-  """Genera el CSV con precios ARS/USD de la competencia."""
-  os.makedirs(os.path.dirname(RUTA_COMPETENCIA), exist_ok=True)
-  with open(
-    RUTA_COMPETENCIA, "w", newline="", encoding="utf-8"
-  ) as f:
-    escritor = csv.writer(f)
-    escritor.writerow(["isbn", "precio_ars", "precio_usd"])
-    for isbn, precio_ars, precio_usd in COMPETENCIA:
-      escritor.writerow([isbn, precio_ars, precio_usd])
+# def _generar_csv_competencia() -> None:
+#   """Genera el CSV con precios ARS/USD de la competencia."""
+#   os.makedirs(os.path.dirname(RUTA_COMPETENCIA), exist_ok=True)
+#   with open(
+#     RUTA_COMPETENCIA, "w", newline="", encoding="utf-8"
+#   ) as f:
+#     escritor = csv.writer(f)
+#     escritor.writerow(["isbn", "precio_ars", "precio_usd"])
+#     for isbn, precio_ars, precio_usd in COMPETENCIA:
+#       escritor.writerow([isbn, precio_ars, precio_usd])
