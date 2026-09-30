@@ -109,7 +109,8 @@ def main(import_default_data: bool = True) -> None:
       )
     elif opcion == "6":
       menu_precios(
-        servicio_precio, repo_precio, repo_libro, repo_tipo
+        servicio_precio, servicio_cotizacion, repo_precio,
+        repo_libro, repo_tipo,
       )
     elif opcion == "7":
       menu_stock(servicio_stock, repo_stock)
