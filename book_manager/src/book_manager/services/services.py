@@ -2,9 +2,9 @@
 from __future__ import annotations
 
 # import csv  # solo usado por ServicioComparacionCompetencia (deshabilitada)
-# import json  # solo usado por obtener_cotizacion_automatica (deshabilitada)
+import json
 import os
-# import urllib.request  # solo usado por obtener_cotizacion_automatica
+import urllib.request
 from datetime import date
 from typing import Dict, List, Optional, Tuple
 
@@ -36,17 +36,15 @@ from book_manager.repositories.repositories import (
 #   "..", "migrations", "csv", "competencia.csv",
 # )
 
-# DESHABILITADO: la consigna indica trabajar sin API. La cotización
-# del dólar se carga manualmente. Se deja comentado para uso futuro.
-# URL_API_DOLAR: str = "https://dolarapi.com/v1/dolares"
+URL_API_DOLAR: str = "https://dolarapi.com/v1/dolares"
 
 
 class ServicioCotizacion:
-  """Gestiona el registro de cotizaciones del dólar.
+  """Gestiona el registro de cotizaciones del dólar en tiempo real.
 
-  Las cotizaciones se cargan manualmente (por consola o desde la
-  precarga de datos) y se guardan con su fecha para formar el
-  histórico por tipo de cotización.
+  Intenta obtener la cotización vigente desde una API pública; si
+  la consulta falla (sin conexión, servicio caído, etc.), permite
+  el registro manual como respaldo, sin interrumpir el sistema.
   """
 
   def __init__(
@@ -57,31 +55,29 @@ class ServicioCotizacion:
     self._repo_cotizacion = repo_cotizacion
     self._repo_tipo = repo_tipo
 
-  # DESHABILITADO: consulta a API pública (DolarAPI). La consigna
-  # pide trabajar sin API; se deja comentado para uso futuro.
-  # def obtener_cotizacion_automatica(
-  #   self, nombre_tipo: str
-  # ) -> Optional[Tuple[float, float]]:
-  #   """Intenta traer la cotización vigente desde la API pública."""
-  #   peticion = urllib.request.Request(
-  #     URL_API_DOLAR,
-  #     headers={"User-Agent": "Mozilla/5.0"},
-  #   )
-  #   try:
-  #     with urllib.request.urlopen(
-  #       peticion, timeout=5
-  #     ) as respuesta:
-  #       datos: List[Dict] = json.loads(respuesta.read())
-  #     for item in datos:
-  #       if str(item.get("nombre", "")).lower() == (
-  #         nombre_tipo.lower()
-  #       ):
-  #         compra: float = float(item.get("compra", 0.0) or 0.0)
-  #         venta: float = float(item.get("venta", 0.0) or 0.0)
-  #         return compra, venta
-  #     return None
-  #   except Exception:
-  #     return None
+  def obtener_cotizacion_automatica(
+    self, nombre_tipo: str
+  ) -> Optional[Tuple[float, float]]:
+    """Intenta traer la cotización vigente desde la API pública."""
+    peticion = urllib.request.Request(
+      URL_API_DOLAR,
+      headers={"User-Agent": "Mozilla/5.0"},
+    )
+    try:
+      with urllib.request.urlopen(
+        peticion, timeout=5
+      ) as respuesta:
+        datos: List[Dict] = json.loads(respuesta.read())
+      for item in datos:
+        if str(item.get("nombre", "")).lower() == (
+          nombre_tipo.lower()
+        ):
+          compra: float = float(item.get("compra", 0.0) or 0.0)
+          venta: float = float(item.get("venta", 0.0) or 0.0)
+          return compra, venta
+      return None
+    except Exception:
+      return None
 
   def registrar_cotizacion(
     self,
