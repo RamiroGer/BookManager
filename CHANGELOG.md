@@ -63,3 +63,8 @@ Los cambios más recientes aparecen primero.
 - Rama Sprint_1 creada.
 - Estructura de directorios del proyecto generada.
 - requirements.txt creado (sin dependencias externas).
+
+## [Ejercicio 06 - Fix CRUD]
+- __pycache__ y *.pyc removidos del repositorio.
+- .gitignore actualizado.
+- CRUD completo en los 8 menús de consola (Listar, Alta, Modificar, Eliminar).
