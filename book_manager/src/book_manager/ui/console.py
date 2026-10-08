@@ -1,12 +1,13 @@
 """Interfaz de consola (CLI) para el sistema Book Manager."""
 from __future__ import annotations
 
-from typing import Optional, Tuple
+from typing import Callable, Dict, List, Optional
 
 from book_manager.entities.entities import (
   Editorial, Genero, Libro, Moneda, TipoCotizacion,
 )
 from book_manager.repositories.repositories import (
+  IRepositorio,
   RepositorioCotizacionDolar,
   RepositorioEditorial,
   RepositorioGenero,
@@ -32,76 +33,95 @@ def _confirmar_accion(mensaje: str) -> bool:
   return respuesta == "s"
 
 
-def menu_generos(repo_genero: RepositorioGenero) -> None:
-  """Lista los géneros y permite dar de alta uno nuevo."""
-  print("\n--- Listado de Géneros ---")
-  for genero in repo_genero.leer_todos():
-    print(f"  {genero}")
+def _menu_crud_simple(
+  nombre_entidad: str,
+  repo: IRepositorio,
+  campos: List[str],
+  construir: Callable[[Dict[str, str]], object],
+  aplicar_cambios: Callable[[object, Dict[str, str]], None],
+) -> None:
+  """Menú CRUD genérico para entidades con campos simples."""
+  print(f"\n--- Listado de {nombre_entidad} ---")
+  for item in repo.leer_todos():
+    print(f"  {item}")
 
-  if not _confirmar_accion("\n¿Desea dar de alta un género?"):
+  print("\n  [1] Alta")
+  print("  [2] Modificar")
+  print("  [3] Eliminar")
+  print("  [0] Volver")
+  opcion: str = input("Opción: ").strip()
+
+  if opcion == "1":
+    valores: Dict[str, str] = {
+      campo: input(f"{campo}: ") for campo in campos
+    }
+    nuevo = construir(valores)
+    print(f"Creado: {repo.crear(nuevo)}")
+  elif opcion == "2":
+    id_: int = int(input("ID a modificar: "))
+    existente = repo.leer_por_id(id_)
+    if existente is None:
+      print(f"No existe id={id_}.")
+      return
+    valores = {
+      campo: input(f"Nuevo valor de {campo}: ")
+      for campo in campos
+    }
+    aplicar_cambios(existente, valores)
+    print(f"Actualizado: {repo.actualizar(existente)}")
+  elif opcion == "3":
+    id_ = int(input("ID a eliminar: "))
+    eliminado: bool = repo.eliminar(id_)
+    mensaje: str = (
+      "Eliminado." if eliminado else f"No existe id={id_}."
+    )
+    print(mensaje)
+  else:
     print("Operación cancelada.")
-    return
 
-  nombre: str = input("Nombre del género: ")
-  nuevo: Genero = repo_genero.crear(Genero(nombre=nombre))
-  print(f"Creado: {nuevo}")
+
+def menu_generos(repo_genero: RepositorioGenero) -> None:
+  """Gestiona el CRUD completo de géneros."""
+  _menu_crud_simple(
+    "Géneros", repo_genero, ["nombre"],
+    lambda v: Genero(nombre=v["nombre"]),
+    lambda e, v: setattr(e, "nombre", v["nombre"]),
+  )
 
 
 def menu_editoriales(repo_editorial: RepositorioEditorial) -> None:
-  """Lista las editoriales y permite dar de alta una nueva."""
-  print("\n--- Listado de Editoriales ---")
-  for editorial in repo_editorial.leer_todos():
-    print(f"  {editorial}")
-
-  if not _confirmar_accion("\n¿Desea dar de alta una editorial?"):
-    print("Operación cancelada.")
-    return
-
-  nombre: str = input("Nombre de la editorial: ")
-  pais: str = input("País: ")
-  nueva: Editorial = repo_editorial.crear(
-    Editorial(nombre=nombre, pais=pais)
+  """Gestiona el CRUD completo de editoriales."""
+  _menu_crud_simple(
+    "Editoriales", repo_editorial, ["nombre", "pais"],
+    lambda v: Editorial(nombre=v["nombre"], pais=v["pais"]),
+    lambda e, v: (
+      setattr(e, "nombre", v["nombre"]),
+      setattr(e, "pais", v["pais"]),
+    ),
   )
-  print(f"Creada: {nueva}")
 
 
 def menu_monedas(repo_moneda: RepositorioMoneda) -> None:
-  """Lista las monedas y permite dar de alta una nueva."""
-  print("\n--- Listado de Monedas ---")
-  for moneda in repo_moneda.leer_todos():
-    print(f"  {moneda}")
-
-  if not _confirmar_accion("\n¿Desea dar de alta una moneda?"):
-    print("Operación cancelada.")
-    return
-
-  codigo: str = input("Código (ej. ARS): ")
-  nombre: str = input("Nombre: ")
-  nueva: Moneda = repo_moneda.crear(
-    Moneda(codigo=codigo, nombre=nombre)
+  """Gestiona el CRUD completo de monedas."""
+  _menu_crud_simple(
+    "Monedas", repo_moneda, ["codigo", "nombre"],
+    lambda v: Moneda(codigo=v["codigo"], nombre=v["nombre"]),
+    lambda e, v: (
+      setattr(e, "codigo", v["codigo"]),
+      setattr(e, "nombre", v["nombre"]),
+    ),
   )
-  print(f"Creada: {nueva}")
 
 
 def menu_tipos_cotizacion(
   repo_tipo: RepositorioTipoCotizacion,
 ) -> None:
-  """Lista los tipos de cotización y permite dar de alta uno."""
-  print("\n--- Listado de Tipos de Cotización ---")
-  for tipo in repo_tipo.leer_todos():
-    print(f"  {tipo}")
-
-  if not _confirmar_accion(
-    "\n¿Desea dar de alta un tipo de cotización?"
-  ):
-    print("Operación cancelada.")
-    return
-
-  nombre: str = input("Nombre del tipo: ")
-  nuevo: TipoCotizacion = repo_tipo.crear(
-    TipoCotizacion(nombre=nombre)
+  """Gestiona el CRUD completo de tipos de cotización."""
+  _menu_crud_simple(
+    "Tipos de Cotización", repo_tipo, ["nombre"],
+    lambda v: TipoCotizacion(nombre=v["nombre"]),
+    lambda e, v: setattr(e, "nombre", v["nombre"]),
   )
-  print(f"Creado: {nuevo}")
 
 
 def menu_libros(
@@ -111,15 +131,41 @@ def menu_libros(
   repo_genero: RepositorioGenero,
   repo_moneda: RepositorioMoneda,
 ) -> None:
-  """Lista los libros y permite dar de alta uno nuevo."""
+  """Gestiona el CRUD completo de libros."""
   print("\n--- Listado de Libros ---")
   for libro in repo_libro.leer_todos():
     print(f"  {libro}")
 
-  if not _confirmar_accion("\n¿Desea dar de alta un libro?"):
-    print("Operación cancelada.")
-    return
+  print("\n  [1] Alta")
+  print("  [2] Modificar")
+  print("  [3] Eliminar")
+  print("  [0] Volver")
+  opcion: str = input("Opción: ").strip()
 
+  if opcion == "1":
+    _alta_libro(
+      servicio_libro, repo_editorial, repo_genero, repo_moneda
+    )
+  elif opcion == "2":
+    _modificar_libro(repo_libro, repo_editorial, repo_genero)
+  elif opcion == "3":
+    id_: int = int(input("ID a eliminar: "))
+    eliminado: bool = repo_libro.eliminar(id_)
+    mensaje: str = (
+      "Eliminado." if eliminado else f"No existe id={id_}."
+    )
+    print(mensaje)
+  else:
+    print("Operación cancelada.")
+
+
+def _alta_libro(
+  servicio_libro: ServicioLibro,
+  repo_editorial: RepositorioEditorial,
+  repo_genero: RepositorioGenero,
+  repo_moneda: RepositorioMoneda,
+) -> None:
+  """Da de alta un libro nuevo con sus precios y stock inicial."""
   if not repo_editorial.leer_todos() or not repo_genero.leer_todos():
     print("Debe existir al menos una editorial y un género.")
     return
@@ -174,50 +220,29 @@ def menu_libros(
   print(f"Creado: {nuevo}")
 
 
-def _pedir_cotizacion_manual() -> Tuple[float, float]:
-  """Pide por consola los valores de compra y venta (ARS)."""
-  valor_compra: float = float(input("Valor de compra (ARS): "))
-  valor_venta: float = float(input("Valor de venta (ARS): "))
-  return valor_compra, valor_venta
-
-
-def _obtener_o_cargar_cotizacion(
-  servicio_cotizacion: ServicioCotizacion,
-  tipo: TipoCotizacion,
+def _modificar_libro(
+  repo_libro: RepositorioLibro,
+  repo_editorial: RepositorioEditorial,
+  repo_genero: RepositorioGenero,
 ) -> None:
-  """Asegura que exista una cotización vigente para un tipo."""
-  cotizacion = servicio_cotizacion.obtener_ultima_cotizacion(
-    tipo.id
-  )
-  if cotizacion is not None:
+  """Modifica los datos básicos de un libro existente."""
+  id_: int = int(input("ID a modificar: "))
+  libro: Optional[Libro] = repo_libro.leer_por_id(id_)
+  if libro is None:
+    print(f"No existe id={id_}.")
     return
 
-  print(f"No hay cotización registrada para \"{tipo.nombre}\".")
-  print("Ingrese los valores manualmente:")
-  valor_compra, valor_venta = _pedir_cotizacion_manual()
+  libro.titulo = input(f"Nuevo título (actual: {libro.titulo}): ")
+  libro.autor = input(f"Nuevo autor (actual: {libro.autor}): ")
 
-  # DESHABILITADO: consulta automática a API (la consigna pide
-  # trabajar sin API). Se deja comentado para uso futuro.
-  # print("Consultando cotización real...")
-  # resultado = servicio_cotizacion.obtener_cotizacion_automatica(
-  #   tipo.nombre
-  # )
-  # if resultado is not None:
-  #   valor_compra, valor_venta = resultado
-  #   print(
-  #     f"Cotización obtenida automáticamente: "
-  #     f"compra ${valor_compra}, venta ${valor_venta}"
-  #   )
-  # else:
-  #   print(
-  #     "No se pudo obtener la cotización automáticamente.\n"
-  #     "Ingrese los valores manualmente:"
-  #   )
-  #   valor_compra, valor_venta = _pedir_cotizacion_manual()
+  for g in repo_genero.leer_todos():
+    print(f"  [{g.id}] {g.nombre}")
+  genero_id: int = int(input("Nuevo ID de género: "))
+  genero: Optional[Genero] = repo_genero.leer_por_id(genero_id)
+  if genero is not None:
+    libro.genero = genero
 
-  servicio_cotizacion.registrar_cotizacion(
-    tipo.id, valor_compra, valor_venta
-  )
+  print(f"Actualizado: {repo_libro.actualizar(libro)}")
 
 
 def menu_precios(
@@ -227,17 +252,49 @@ def menu_precios(
   repo_libro: RepositorioLibro,
   repo_tipo: RepositorioTipoCotizacion,
 ) -> None:
-  """Lista precios (ARS/USD) y permite actualizar el ARS de un libro."""
+  """Gestiona el CRUD completo de precios."""
   print("\n--- Listado de Precios (ARS y USD) ---")
   for precio in repo_precio.leer_todos():
     print(f"  {precio}")
 
-  if not _confirmar_accion(
-    "\n¿Desea actualizar el precio ARS de un libro?"
-  ):
-    print("Operación cancelada.")
-    return
+  print("\n  [1] Actualizar ARS según cotización (sugerido)")
+  print("  [2] Modificar un precio directamente")
+  print("  [3] Eliminar un precio")
+  print("  [0] Volver")
+  opcion: str = input("Opción: ").strip()
 
+  if opcion == "1":
+    _sugerir_y_aplicar_precio(
+      servicio_precio, servicio_cotizacion, repo_libro, repo_tipo
+    )
+  elif opcion == "2":
+    id_: int = int(input("ID de precio a modificar: "))
+    precio = repo_precio.leer_por_id(id_)
+    if precio is None:
+      print(f"No existe id={id_}.")
+      return
+    precio.monto = float(
+      input(f"Nuevo monto (actual: {precio.monto}): ")
+    )
+    print(f"Actualizado: {repo_precio.actualizar(precio)}")
+  elif opcion == "3":
+    id_ = int(input("ID de precio a eliminar: "))
+    eliminado: bool = repo_precio.eliminar(id_)
+    mensaje: str = (
+      "Eliminado." if eliminado else f"No existe id={id_}."
+    )
+    print(mensaje)
+  else:
+    print("Operación cancelada.")
+
+
+def _sugerir_y_aplicar_precio(
+  servicio_precio: ServicioPrecio,
+  servicio_cotizacion: ServicioCotizacion,
+  repo_libro: RepositorioLibro,
+  repo_tipo: RepositorioTipoCotizacion,
+) -> None:
+  """Calcula el ARS sugerido según cotización y ofrece aplicarlo."""
   for l in repo_libro.leer_todos():
     print(f"  [{l.id}] {l.titulo}")
   libro_id: int = int(input("ID de libro: "))
@@ -274,32 +331,92 @@ def menu_precios(
     print("Precio no aplicado.")
 
 
+def _obtener_o_cargar_cotizacion(
+  servicio_cotizacion: ServicioCotizacion,
+  tipo: TipoCotizacion,
+) -> None:
+  """Asegura que exista una cotización vigente para un tipo."""
+  cotizacion = servicio_cotizacion.obtener_ultima_cotizacion(
+    tipo.id
+  )
+  if cotizacion is not None:
+    return
+
+  print(f"No hay cotización registrada para \"{tipo.nombre}\".")
+  print("Consultando cotización real...")
+  resultado = servicio_cotizacion.obtener_cotizacion_automatica(
+    tipo.nombre
+  )
+
+  if resultado is not None:
+    valor_compra, valor_venta = resultado
+    print(
+      f"Cotización obtenida automáticamente: "
+      f"compra ${valor_compra}, venta ${valor_venta}"
+    )
+  else:
+    print(
+      "No se pudo obtener la cotización automáticamente.\n"
+      "Ingrese los valores manualmente:"
+    )
+    valor_compra = float(input("Valor de compra (ARS): "))
+    valor_venta = float(input("Valor de venta (ARS): "))
+
+  servicio_cotizacion.registrar_cotizacion(
+    tipo.id, valor_compra, valor_venta
+  )
+
+
 def menu_stock(
   servicio_stock: ServicioStock, repo_stock: RepositorioStock
 ) -> None:
-  """Lista el stock y permite modificar la cantidad de un libro."""
+  """Gestiona el CRUD completo de stock."""
   print("\n--- Listado de Stock ---")
   for stock in repo_stock.leer_todos():
     print(f"  {stock}")
 
-  if not _confirmar_accion("\n¿Desea modificar el stock?"):
-    print("Operación cancelada.")
-    return
+  print("\n  [1] Ajustar cantidad (ingreso/egreso)")
+  print("  [2] Modificar cantidad directamente")
+  print("  [3] Eliminar registro de stock")
+  print("  [0] Volver")
+  opcion: str = input("Opción: ").strip()
 
-  libro_id: int = int(input("ID de libro: "))
-  cantidad: int = int(
-    input("Cantidad (positiva=ingreso, negativa=egreso): ")
-  )
-  try:
-    if cantidad >= 0:
-      actualizado = servicio_stock.ingresar(libro_id, cantidad)
-    else:
-      actualizado = servicio_stock.egresar(
-        libro_id, abs(cantidad)
-      )
-    print(f"Stock actualizado: {actualizado}")
-  except ValueError as error:
-    print(f"Error: {error}")
+  if opcion == "1":
+    libro_id: int = int(input("ID de libro: "))
+    cantidad: int = int(
+      input("Cantidad (positiva=ingreso, negativa=egreso): ")
+    )
+    try:
+      if cantidad >= 0:
+        actualizado = servicio_stock.ingresar(libro_id, cantidad)
+      else:
+        actualizado = servicio_stock.egresar(
+          libro_id, abs(cantidad)
+        )
+      print(f"Stock actualizado: {actualizado}")
+    except ValueError as error:
+      print(f"Error: {error}")
+  elif opcion == "2":
+    id_: int = int(input("ID de stock a modificar: "))
+    stock = repo_stock.leer_por_id(id_)
+    if stock is None:
+      print(f"No existe id={id_}.")
+      return
+    stock.cantidad = int(
+      input(f"Nueva cantidad (actual: {stock.cantidad}): ")
+    )
+    print(f"Actualizado: {repo_stock.actualizar(stock)}")
+  elif opcion == "3":
+    libro_id = int(input("ID de libro cuyo stock eliminar: "))
+    eliminado: bool = repo_stock.eliminar(libro_id)
+    mensaje: str = (
+      "Eliminado."
+      if eliminado
+      else f"No hay stock para el libro id={libro_id}."
+    )
+    print(mensaje)
+  else:
+    print("Operación cancelada.")
 
 
 def menu_cotizaciones(
@@ -307,17 +424,51 @@ def menu_cotizaciones(
   repo_cotizacion: RepositorioCotizacionDolar,
   repo_tipo: RepositorioTipoCotizacion,
 ) -> None:
-  """Lista cotizaciones y registra una nueva (carga manual)."""
+  """Gestiona el CRUD completo de cotizaciones del dólar."""
   print("\n--- Listado de Cotizaciones ---")
   for cot in repo_cotizacion.leer_todos():
     print(f"  {cot}")
 
-  if not _confirmar_accion(
-    "\n¿Desea registrar una nueva cotización?"
-  ):
-    print("Operación cancelada.")
-    return
+  print("\n  [1] Alta (API o manual)")
+  print("  [2] Modificar una cotización")
+  print("  [3] Eliminar una cotización")
+  print("  [0] Volver")
+  opcion: str = input("Opción: ").strip()
 
+  if opcion == "1":
+    _alta_cotizacion(servicio_cotizacion, repo_tipo)
+  elif opcion == "2":
+    id_: int = int(input("ID de cotización a modificar: "))
+    cot = repo_cotizacion.leer_por_id(id_)
+    if cot is None:
+      print(f"No existe id={id_}.")
+      return
+    cot.valor_compra = float(
+      input(f"Nuevo valor compra (actual: {cot.valor_compra}): ")
+    )
+    cot.valor_venta = float(
+      input(f"Nuevo valor venta (actual: {cot.valor_venta}): ")
+    )
+    print(f"Actualizada: {repo_cotizacion.actualizar(cot)}")
+  elif opcion == "3":
+    tipo_id: int = int(input("ID de tipo: "))
+    fecha: str = input("Fecha (YYYY-MM-DD): ")
+    eliminado: bool = repo_cotizacion.eliminar(tipo_id, fecha)
+    mensaje: str = (
+      "Eliminada."
+      if eliminado
+      else "No existe una cotización con ese tipo y fecha."
+    )
+    print(mensaje)
+  else:
+    print("Operación cancelada.")
+
+
+def _alta_cotizacion(
+  servicio_cotizacion: ServicioCotizacion,
+  repo_tipo: RepositorioTipoCotizacion,
+) -> None:
+  """Registra una nueva cotización, vía API o manual."""
   for t in repo_tipo.leer_todos():
     print(f"  [{t.id}] {t.nombre}")
   tipo_id: int = int(input("ID de tipo de cotización: "))
@@ -327,27 +478,24 @@ def menu_cotizaciones(
     print(f"No existe el tipo id={tipo_id}.")
     return
 
-  print(f"Cotización para \"{tipo.nombre}\":")
-  valor_compra, valor_venta = _pedir_cotizacion_manual()
+  print(f"Consultando cotización real para \"{tipo.nombre}\"...")
+  resultado = servicio_cotizacion.obtener_cotizacion_automatica(
+    tipo.nombre
+  )
 
-  # DESHABILITADO: consulta automática a API (la consigna pide
-  # trabajar sin API). Se deja comentado para uso futuro.
-  # print(f"Consultando cotización real para \"{tipo.nombre}\"...")
-  # resultado = servicio_cotizacion.obtener_cotizacion_automatica(
-  #   tipo.nombre
-  # )
-  # if resultado is not None:
-  #   valor_compra, valor_venta = resultado
-  #   print(
-  #     f"Cotización obtenida automáticamente: "
-  #     f"compra ${valor_compra}, venta ${valor_venta}"
-  #   )
-  # else:
-  #   print(
-  #     "No se pudo obtener la cotización automáticamente.\n"
-  #     "Ingrese los valores manualmente:"
-  #   )
-  #   valor_compra, valor_venta = _pedir_cotizacion_manual()
+  if resultado is not None:
+    valor_compra, valor_venta = resultado
+    print(
+      f"Cotización obtenida automáticamente: "
+      f"compra ${valor_compra}, venta ${valor_venta}"
+    )
+  else:
+    print(
+      "No se pudo obtener la cotización automáticamente.\n"
+      "Ingrese los valores manualmente:"
+    )
+    valor_compra = float(input("Valor de compra (ARS): "))
+    valor_venta = float(input("Valor de venta (ARS): "))
 
   try:
     nueva = servicio_cotizacion.registrar_cotizacion(
