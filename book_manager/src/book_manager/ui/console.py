@@ -33,6 +33,22 @@ def _confirmar_accion(mensaje: str) -> bool:
   return respuesta == "s"
 
 
+def _existe_duplicado(
+  repo: IRepositorio,
+  campo: str,
+  valor: str,
+  id_excluido: Optional[int] = None,
+) -> bool:
+  """Indica si ya hay otro registro con el mismo valor en el campo."""
+  buscado: str = valor.strip().lower()
+  for item in repo.leer_todos():
+    if getattr(item, "id", None) == id_excluido:
+      continue
+    if str(getattr(item, campo)).strip().lower() == buscado:
+      return True
+  return False
+
+
 def _menu_crud_simple(
   nombre_entidad: str,
   repo: IRepositorio,
@@ -55,6 +71,9 @@ def _menu_crud_simple(
     valores: Dict[str, str] = {
       campo: input(f"{campo}: ") for campo in campos
     }
+    if _existe_duplicado(repo, campos[0], valores[campos[0]]):
+      print(f"Ya existe un registro con ese {campos[0]}.")
+      return
     nuevo = construir(valores)
     print(f"Creado: {repo.crear(nuevo)}")
   elif opcion == "2":
@@ -67,6 +86,11 @@ def _menu_crud_simple(
       campo: input(f"Nuevo valor de {campo}: ")
       for campo in campos
     }
+    if _existe_duplicado(
+      repo, campos[0], valores[campos[0]], existente.id
+    ):
+      print(f"Ya existe un registro con ese {campos[0]}.")
+      return
     aplicar_cambios(existente, valores)
     print(f"Actualizado: {repo.actualizar(existente)}")
   elif opcion == "3":
