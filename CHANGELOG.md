@@ -1,3 +1,7 @@
+## [Ejercicio 03 - Sprint 2]
+- Context manager transaccion: commit al finalizar y rollback ante error.
+- La sesión siempre se cierra al salir del bloque.
+
 ## [Ejercicio 02 - Sprint 2]
 - Clase ConexionDB con motor SQLite de SQLAlchemy.
 - Base declarativa compartida por los modelos.

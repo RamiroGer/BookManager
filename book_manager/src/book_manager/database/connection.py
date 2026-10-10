@@ -2,7 +2,8 @@
 from __future__ import annotations
 
 import os
-from typing import Any
+from contextlib import contextmanager
+from typing import Any, Iterator
 
 from sqlalchemy import create_engine, event
 from sqlalchemy.engine import Engine
@@ -37,3 +38,16 @@ class ConexionDB:
   def crear_tablas(self) -> None:
     """Crea las tablas definidas en los modelos si no existen."""
     Base.metadata.create_all(self._engine)
+
+  @contextmanager
+  def transaccion(self) -> Iterator[Session]:
+    """Abre una sesión y confirma o revierte la transacción."""
+    sesion: Session = self._fabrica_sesiones()
+    try:
+      yield sesion
+      sesion.commit()
+    except Exception:
+      sesion.rollback()
+      raise
+    finally:
+      sesion.close()
