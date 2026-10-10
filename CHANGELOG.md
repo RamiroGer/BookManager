@@ -1,3 +1,10 @@
+## [Ejercicio 01 - Sprint 2]
+- Rama Sprint_2 creada a partir de Sprint_1.
+- Agregadas las carpetas database, models y migrations (csv y sql).
+- requirements.txt con sqlalchemy y python-dotenv.
+- .gitignore ignora __pycache__, .pyc y la base de datos .db.
+- CHANGELOG reordenado: el último cambio se lee primero.
+
 # Changelog
 
 Los cambios más recientes aparecen primero.

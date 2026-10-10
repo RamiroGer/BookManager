@@ -1,2 +1,2 @@
-# Book Manager utiliza únicamente la librería estándar de Python.
-# No se requieren dependencias externas.
+sqlalchemy
+python-dotenv
