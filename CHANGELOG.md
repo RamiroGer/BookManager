@@ -1,3 +1,9 @@
+## [Ejercicio 02 - Sprint 2]
+- Clase ConexionDB con motor SQLite de SQLAlchemy.
+- Base declarativa compartida por los modelos.
+- Claves foráneas activadas en SQLite.
+- Método crear_tablas.
+
 ## [Ejercicio 01 - Sprint 2]
 - Rama Sprint_2 creada a partir de Sprint_1.
 - Agregadas las carpetas database, models y migrations (csv y sql).
