@@ -1,3 +1,8 @@
+## [Ejercicio 04 - Sprint 2]
+- Modelos ORM para las 8 tablas del sistema.
+- Relaciones entre libro, género, editorial, precio, stock y moneda.
+- Restricciones unique y borrado en cascada de precios y stock.
+
 ## [Ejercicio 03 - Sprint 2]
 - Context manager transaccion: commit al finalizar y rollback ante error.
 - La sesión siempre se cierra al salir del bloque.
