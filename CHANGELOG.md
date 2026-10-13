@@ -1,3 +1,9 @@
+## [Ejercicio 06 - Sprint 2]
+- Repositorios reescritos sobre SQLAlchemy con CRUD completo.
+- RepositorioDBBase genérico que traduce modelo y entidad.
+- Errores de integridad informados como ValueError.
+- Servicios y consola no cambian sus llamadas a los repositorios.
+
 ## [Ejercicio 05 - Sprint 2]
 - preload_data genera los CSV de origen si no existen.
 - migrar_datos lee los CSV, genera un .sql por tabla y los ejecuta.
