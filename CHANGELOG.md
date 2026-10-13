@@ -1,3 +1,10 @@
+## [Ejercicio 07 - Sprint 2]
+- Archivo .env con API_URL de DolarAPI.
+- ServicioCotizacionDolar.obtener_cotizaciones descarga y registra.
+- Nombres de la API normalizados (Bolsa a MEP, CCL).
+- Una cotización por tipo y fecha: si existe se actualiza.
+- ServicioPrecio suma lista bimonetaria y exportación a CSV.
+
 ## [Ejercicio 06 - Sprint 2]
 - Repositorios reescritos sobre SQLAlchemy con CRUD completo.
 - RepositorioDBBase genérico que traduce modelo y entidad.

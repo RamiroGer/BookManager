@@ -1,12 +1,14 @@
 """Servicios de lógica de negocio para Book Manager."""
 from __future__ import annotations
 
-# import csv  # solo usado por ServicioComparacionCompetencia (deshabilitada)
+import csv
 import json
 import os
 import urllib.request
 from datetime import date
 from typing import Dict, List, Optional, Tuple
+
+from dotenv import load_dotenv
 
 from book_manager.entities.entities import (
   CotizacionDolar,
@@ -20,8 +22,6 @@ from book_manager.entities.entities import (
 )
 from book_manager.repositories.repositories import (
   RepositorioCotizacionDolar,
-  RepositorioEditorial,
-  RepositorioGenero,
   RepositorioLibro,
   RepositorioMoneda,
   RepositorioPrecio,
@@ -29,23 +29,22 @@ from book_manager.repositories.repositories import (
   RepositorioTipoCotizacion,
 )
 
-# RUTA_COMPETENCIA: solo usada por ServicioComparacionCompetencia
-# (deshabilitada, ver más abajo)
-# RUTA_COMPETENCIA: str = os.path.join(
-#   os.path.dirname(__file__),
-#   "..", "migrations", "csv", "competencia.csv",
-# )
+RUTA_BASE: str = os.path.join(
+  os.path.dirname(os.path.abspath(__file__)), "..", "..", ".."
+)
+RUTA_ENV: str = os.path.join(RUTA_BASE, ".env")
+RUTA_EXPORTS: str = os.path.join(RUTA_BASE, "exports")
 
-URL_API_DOLAR: str = "https://dolarapi.com/v1/dolares"
+load_dotenv(RUTA_ENV)
+
+NOMBRES_API: Dict[str, str] = {
+  "Bolsa": "MEP",
+  "Contado con liquidación": "CCL",
+}
 
 
-class ServicioCotizacion:
-  """Gestiona el registro de cotizaciones del dólar en tiempo real.
-
-  Intenta obtener la cotización vigente desde una API pública; si
-  la consulta falla (sin conexión, servicio caído, etc.), permite
-  el registro manual como respaldo, sin interrumpir el sistema.
-  """
+class ServicioCotizacionDolar:
+  """Gestiona el registro de cotizaciones del dólar vía API."""
 
   def __init__(
     self,
@@ -55,29 +54,54 @@ class ServicioCotizacion:
     self._repo_cotizacion = repo_cotizacion
     self._repo_tipo = repo_tipo
 
-  def obtener_cotizacion_automatica(
-    self, nombre_tipo: str
-  ) -> Optional[Tuple[float, float]]:
-    """Intenta traer la cotización vigente desde la API pública."""
+  def _descargar_cotizaciones(self) -> List[Dict]:
+    """Descarga el listado de cotizaciones desde la API."""
+    url: Optional[str] = os.getenv("API_URL")
+    if not url:
+      raise ValueError("Falta la variable API_URL en el .env.")
     peticion = urllib.request.Request(
-      URL_API_DOLAR,
-      headers={"User-Agent": "Mozilla/5.0"},
+      url, headers={"User-Agent": "Mozilla/5.0"}
     )
     try:
       with urllib.request.urlopen(
-        peticion, timeout=5
+        peticion, timeout=10
       ) as respuesta:
-        datos: List[Dict] = json.loads(respuesta.read())
-      for item in datos:
-        if str(item.get("nombre", "")).lower() == (
-          nombre_tipo.lower()
-        ):
-          compra: float = float(item.get("compra", 0.0) or 0.0)
-          venta: float = float(item.get("venta", 0.0) or 0.0)
-          return compra, venta
-      return None
-    except Exception:
-      return None
+        return json.loads(respuesta.read())
+    except (OSError, ValueError) as error:
+      raise ConnectionError(
+        f"No se pudo consultar la API: {error}"
+      ) from error
+
+  def _buscar_o_crear_tipo(self, nombre: str) -> TipoCotizacion:
+    """Retorna el tipo con ese nombre, creándolo si no existe."""
+    for tipo in self._repo_tipo.leer_todos():
+      if tipo.nombre.lower() == nombre.lower():
+        return tipo
+    return self._repo_tipo.crear(TipoCotizacion(nombre=nombre))
+
+  def obtener_cotizaciones(self) -> List[CotizacionDolar]:
+    """Descarga y registra en la base las cotizaciones de la API."""
+    registradas: List[CotizacionDolar] = []
+    for item in self._descargar_cotizaciones():
+      nombre_api: str = str(item.get("nombre", "")).strip()
+      if not nombre_api:
+        continue
+      tipo: TipoCotizacion = self._buscar_o_crear_tipo(
+        NOMBRES_API.get(nombre_api, nombre_api)
+      )
+      fecha: str = (
+        str(item.get("fechaActualizacion") or "")[:10]
+        or date.today().isoformat()
+      )
+      registradas.append(
+        self.registrar_cotizacion(
+          tipo.id,
+          float(item.get("compra") or 0.0),
+          float(item.get("venta") or 0.0),
+          fecha,
+        )
+      )
+    return registradas
 
   def registrar_cotizacion(
     self,
@@ -86,20 +110,30 @@ class ServicioCotizacion:
     valor_venta: float,
     fecha: Optional[str] = None,
   ) -> CotizacionDolar:
-    """Registra una nueva cotización para un tipo dado."""
+    """Registra la cotización de un tipo y fecha, o la actualiza."""
     tipo: Optional[TipoCotizacion] = self._repo_tipo.leer_por_id(
       tipo_id
     )
     if tipo is None:
       raise ValueError(f"No existe el tipo id={tipo_id}.")
     fecha_real: str = fecha or date.today().isoformat()
-    cotizacion: CotizacionDolar = CotizacionDolar(
-      tipo=tipo,
-      fecha=fecha_real,
-      valor_compra=valor_compra,
-      valor_venta=valor_venta,
+    existente: Optional[CotizacionDolar] = (
+      self._repo_cotizacion.leer_por_tipo_y_fecha(
+        tipo_id, fecha_real
+      )
     )
-    return self._repo_cotizacion.crear(cotizacion)
+    if existente is not None:
+      existente.valor_compra = valor_compra
+      existente.valor_venta = valor_venta
+      return self._repo_cotizacion.actualizar(existente)
+    return self._repo_cotizacion.crear(
+      CotizacionDolar(
+        tipo=tipo,
+        fecha=fecha_real,
+        valor_compra=valor_compra,
+        valor_venta=valor_venta,
+      )
+    )
 
   def obtener_ultima_cotizacion(
     self, tipo_id: int
@@ -120,10 +154,12 @@ class ServicioPrecio:
     self,
     repo_precio: RepositorioPrecio,
     repo_moneda: RepositorioMoneda,
-    servicio_cotizacion: ServicioCotizacion,
+    repo_libro: RepositorioLibro,
+    servicio_cotizacion: ServicioCotizacionDolar,
   ) -> None:
     self._repo_precio = repo_precio
     self._repo_moneda = repo_moneda
+    self._repo_libro = repo_libro
     self._servicio_cotizacion = servicio_cotizacion
 
   def precios_de_libro(self, libro_id: int) -> List[Precio]:
@@ -186,6 +222,47 @@ class ServicioPrecio:
       raise ValueError("El libro no tiene precio en ARS.")
     precio_ars.monto = monto_ars
     return self._repo_precio.actualizar(precio_ars)
+
+  def lista_bimonetaria(
+    self, codigo_otra: str
+  ) -> List[Tuple[Libro, Optional[float], Optional[float]]]:
+    """Lista cada libro con su precio en ARS y en otra moneda."""
+    lista: List[Tuple[Libro, Optional[float], Optional[float]]] = []
+    for libro in self._repo_libro.leer_todos():
+      precio_ars: Optional[Precio] = self.precio_por_moneda(
+        libro.id, "ARS"
+      )
+      precio_otra: Optional[Precio] = self.precio_por_moneda(
+        libro.id, codigo_otra
+      )
+      lista.append((
+        libro,
+        precio_ars.monto if precio_ars else None,
+        precio_otra.monto if precio_otra else None,
+      ))
+    return lista
+
+  def exportar_precios_csv(
+    self, carpeta: str = RUTA_EXPORTS
+  ) -> str:
+    """Exporta los precios de todas las monedas a un archivo CSV."""
+    monedas: List[Moneda] = self._repo_moneda.leer_todos()
+    os.makedirs(carpeta, exist_ok=True)
+    ruta: str = os.path.join(carpeta, "precios.csv")
+    with open(ruta, "w", newline="", encoding="utf-8") as f:
+      escritor = csv.writer(f)
+      escritor.writerow(
+        ["isbn", "titulo"] + [m.codigo for m in monedas]
+      )
+      for libro in self._repo_libro.leer_todos():
+        fila: List[str] = [libro.isbn, libro.titulo]
+        for moneda in monedas:
+          precio: Optional[Precio] = self.precio_por_moneda(
+            libro.id, moneda.codigo
+          )
+          fila.append("" if precio is None else str(precio.monto))
+        escritor.writerow(fila)
+    return os.path.abspath(ruta)
 
 
 class ServicioStock:
