@@ -1,3 +1,10 @@
+## [Ejercicio 08 - Sprint 2]
+- Opción 11: obtener las cotizaciones por API.
+- Opción 12: lista de precios en pesos y otra moneda elegida.
+- Opción 13: exportar los precios de todas las monedas a CSV.
+- main inicializa la base y migra los CSV si está vacía.
+- Errores de entrada o integridad informados sin cortar el programa.
+
 ## [Ejercicio 07 - Sprint 2]
 - Archivo .env con API_URL de DolarAPI.
 - ServicioCotizacionDolar.obtener_cotizaciones descarga y registra.

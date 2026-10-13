@@ -18,8 +18,7 @@ from book_manager.repositories.repositories import (
   RepositorioTipoCotizacion,
 )
 from book_manager.services.services import (
-  # ServicioComparacionCompetencia,  # deshabilitada
-  ServicioCotizacion,
+  ServicioCotizacionDolar,
   ServicioLibro,
   ServicioPrecio,
   ServicioReportes,
@@ -216,10 +215,6 @@ def _alta_libro(
     print(f"No existe un género con id={genero_id}.")
     return
 
-  precio_ars: float = float(input("Precio (ARS): "))
-  precio_usd: float = float(input("Precio (USD): "))
-  cantidad: int = int(input("Cantidad inicial de stock: "))
-
   moneda_ars: Optional[Moneda] = next(
     (m for m in repo_moneda.leer_todos() if m.codigo == "ARS"),
     None,
@@ -228,6 +223,14 @@ def _alta_libro(
     (m for m in repo_moneda.leer_todos() if m.codigo == "USD"),
     None,
   )
+
+  if moneda_ars is None or moneda_usd is None:
+    print("Deben existir las monedas ARS y USD.")
+    return
+
+  precio_ars: float = float(input("Precio (ARS): "))
+  precio_usd: float = float(input("Precio (USD): "))
+  cantidad: int = int(input("Cantidad inicial de stock: "))
 
   nuevo: Libro = servicio_libro.registrar_libro(
     isbn=isbn,
@@ -271,7 +274,7 @@ def _modificar_libro(
 
 def menu_precios(
   servicio_precio: ServicioPrecio,
-  servicio_cotizacion: ServicioCotizacion,
+  servicio_cotizacion: ServicioCotizacionDolar,
   repo_precio: RepositorioPrecio,
   repo_libro: RepositorioLibro,
   repo_tipo: RepositorioTipoCotizacion,
@@ -314,7 +317,7 @@ def menu_precios(
 
 def _sugerir_y_aplicar_precio(
   servicio_precio: ServicioPrecio,
-  servicio_cotizacion: ServicioCotizacion,
+  servicio_cotizacion: ServicioCotizacionDolar,
   repo_libro: RepositorioLibro,
   repo_tipo: RepositorioTipoCotizacion,
 ) -> None:
@@ -356,7 +359,7 @@ def _sugerir_y_aplicar_precio(
 
 
 def _obtener_o_cargar_cotizacion(
-  servicio_cotizacion: ServicioCotizacion,
+  servicio_cotizacion: ServicioCotizacionDolar,
   tipo: TipoCotizacion,
 ) -> None:
   """Asegura que exista una cotización vigente para un tipo."""
@@ -367,25 +370,18 @@ def _obtener_o_cargar_cotizacion(
     return
 
   print(f"No hay cotización registrada para \"{tipo.nombre}\".")
-  print("Consultando cotización real...")
-  resultado = servicio_cotizacion.obtener_cotizacion_automatica(
-    tipo.nombre
-  )
+  print("Consultando cotizaciones en la API...")
+  try:
+    servicio_cotizacion.obtener_cotizaciones()
+  except (ConnectionError, ValueError) as error:
+    print(f"No se pudo usar la API: {error}")
 
-  if resultado is not None:
-    valor_compra, valor_venta = resultado
-    print(
-      f"Cotización obtenida automáticamente: "
-      f"compra ${valor_compra}, venta ${valor_venta}"
-    )
-  else:
-    print(
-      "No se pudo obtener la cotización automáticamente.\n"
-      "Ingrese los valores manualmente:"
-    )
-    valor_compra = float(input("Valor de compra (ARS): "))
-    valor_venta = float(input("Valor de venta (ARS): "))
+  if servicio_cotizacion.obtener_ultima_cotizacion(tipo.id):
+    return
 
+  print("Ingrese los valores manualmente:")
+  valor_compra: float = float(input("Valor de compra (ARS): "))
+  valor_venta: float = float(input("Valor de venta (ARS): "))
   servicio_cotizacion.registrar_cotizacion(
     tipo.id, valor_compra, valor_venta
   )
@@ -444,7 +440,7 @@ def menu_stock(
 
 
 def menu_cotizaciones(
-  servicio_cotizacion: ServicioCotizacion,
+  servicio_cotizacion: ServicioCotizacionDolar,
   repo_cotizacion: RepositorioCotizacionDolar,
   repo_tipo: RepositorioTipoCotizacion,
 ) -> None:
@@ -453,7 +449,7 @@ def menu_cotizaciones(
   for cot in repo_cotizacion.leer_todos():
     print(f"  {cot}")
 
-  print("\n  [1] Alta (API o manual)")
+  print("\n  [1] Alta manual")
   print("  [2] Modificar una cotización")
   print("  [3] Eliminar una cotización")
   print("  [0] Volver")
@@ -489,37 +485,15 @@ def menu_cotizaciones(
 
 
 def _alta_cotizacion(
-  servicio_cotizacion: ServicioCotizacion,
+  servicio_cotizacion: ServicioCotizacionDolar,
   repo_tipo: RepositorioTipoCotizacion,
 ) -> None:
-  """Registra una nueva cotización, vía API o manual."""
+  """Registra manualmente una cotización para un tipo."""
   for t in repo_tipo.leer_todos():
     print(f"  [{t.id}] {t.nombre}")
   tipo_id: int = int(input("ID de tipo de cotización: "))
-
-  tipo: Optional[TipoCotizacion] = repo_tipo.leer_por_id(tipo_id)
-  if tipo is None:
-    print(f"No existe el tipo id={tipo_id}.")
-    return
-
-  print(f"Consultando cotización real para \"{tipo.nombre}\"...")
-  resultado = servicio_cotizacion.obtener_cotizacion_automatica(
-    tipo.nombre
-  )
-
-  if resultado is not None:
-    valor_compra, valor_venta = resultado
-    print(
-      f"Cotización obtenida automáticamente: "
-      f"compra ${valor_compra}, venta ${valor_venta}"
-    )
-  else:
-    print(
-      "No se pudo obtener la cotización automáticamente.\n"
-      "Ingrese los valores manualmente:"
-    )
-    valor_compra = float(input("Valor de compra (ARS): "))
-    valor_venta = float(input("Valor de venta (ARS): "))
+  valor_compra: float = float(input("Valor de compra (ARS): "))
+  valor_venta: float = float(input("Valor de venta (ARS): "))
 
   try:
     nueva = servicio_cotizacion.registrar_cotizacion(
@@ -574,3 +548,51 @@ def reporte_catalogo(
       f"  {libro.titulo} — Stock: {item['cantidad']} — "
       f"Precios: {item['precios']}"
     )
+
+
+def opcion_obtener_cotizaciones(
+  servicio_cotizacion: ServicioCotizacionDolar,
+) -> None:
+  """Descarga las cotizaciones de la API y las registra."""
+  print("\n--- Obtener cotizaciones por API ---")
+  try:
+    registradas = servicio_cotizacion.obtener_cotizaciones()
+  except (ConnectionError, ValueError) as error:
+    print(f"No se pudieron obtener las cotizaciones: {error}")
+    return
+  for cot in registradas:
+    print(f"  {cot}")
+  print(f"{len(registradas)} cotizaciones registradas.")
+
+
+def reporte_precios_bimonetarios(
+  servicio_precio: ServicioPrecio,
+  repo_moneda: RepositorioMoneda,
+) -> None:
+  """Muestra la lista de precios en pesos y en otra moneda."""
+  otras: List[Moneda] = [
+    m for m in repo_moneda.leer_todos() if m.codigo != "ARS"
+  ]
+  if not otras:
+    print("No hay otras monedas además de ARS.")
+    return
+  for m in otras:
+    print(f"  [{m.codigo}] {m.nombre}")
+  codigo: str = input("Código de la moneda: ").strip().upper()
+  if codigo not in [m.codigo for m in otras]:
+    print(f"Moneda inválida: {codigo}.")
+    return
+
+  print(f"\n--- Lista de precios ARS / {codigo} ---")
+  for libro, ars, otra in servicio_precio.lista_bimonetaria(codigo):
+    texto_ars: str = "sin precio" if ars is None else f"${ars}"
+    texto_otra: str = (
+      "sin precio" if otra is None else f"{otra} {codigo}"
+    )
+    print(f"  {libro.titulo}: {texto_ars} | {texto_otra}")
+
+
+def exportar_precios(servicio_precio: ServicioPrecio) -> None:
+  """Exporta los precios de todas las monedas a un CSV."""
+  ruta: str = servicio_precio.exportar_precios_csv()
+  print(f"Precios exportados en: {ruta}")

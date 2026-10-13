@@ -1,8 +1,14 @@
 """Punto de entrada del sistema Book Manager."""
 from __future__ import annotations
 
+from book_manager.database.connection import ConexionDB
+from book_manager.migrations.migrations import (
+  RUTA_CSV,
+  RUTA_SQL,
+  migrar_datos,
+)
 from book_manager.preload_data.preload_data import (
-  cargar_datos_iniciales,
+  generar_csvs_iniciales,
 )
 from book_manager.repositories.repositories import (
   RepositorioCotizacionDolar,
@@ -16,13 +22,14 @@ from book_manager.repositories.repositories import (
 )
 from book_manager.services.services import (
   # ServicioComparacionCompetencia,  # deshabilitada (Tema 9)
-  ServicioCotizacion,
+  ServicioCotizacionDolar,
   ServicioLibro,
   ServicioPrecio,
   ServicioReportes,
   ServicioStock,
 )
 from book_manager.ui.console import (
+  exportar_precios,
   menu_cotizaciones,
   menu_editoriales,
   menu_generos,
@@ -31,9 +38,10 @@ from book_manager.ui.console import (
   menu_precios,
   menu_stock,
   menu_tipos_cotizacion,
+  opcion_obtener_cotizaciones,
   reporte_bajo_stock,
   reporte_catalogo,
-  # reporte_comparacion_competencia,  # deshabilitada (Tema 9)
+  reporte_precios_bimonetarios,
 )
 
 OPCIONES_MENU: str = """
@@ -48,89 +56,97 @@ OPCIONES_MENU: str = """
 8) Cotizaciones del Dólar
 9) Reporte: Bajo Stock
 10) Reporte: Catálogo Completo
+11) Obtener cotizaciones por API
+12) Lista de precios bimonetaria
+13) Exportar precios a CSV
 0) Salir
 ========================="""
 
 
 def main(import_default_data: bool = True) -> None:
-  """Inicializa el sistema y ejecuta el menú principal."""
-  repo_genero = RepositorioGenero()
-  repo_editorial = RepositorioEditorial()
-  repo_moneda = RepositorioMoneda()
-  repo_tipo = RepositorioTipoCotizacion()
-  repo_libro = RepositorioLibro(repo_editorial, repo_genero)
-  repo_precio = RepositorioPrecio(repo_libro, repo_moneda)
-  repo_stock = RepositorioStock(repo_libro)
-  repo_cotizacion = RepositorioCotizacionDolar(repo_tipo)
+  """Inicializa la base de datos y ejecuta el menú principal.
 
-  servicio_cotizacion = ServicioCotizacion(
+  Args:
+    import_default_data: Si es True migra los CSV a la base aunque
+      ya tenga datos; si la base está vacía siempre se migra.
+  """
+  conexion = ConexionDB()
+  conexion.crear_tablas()
+
+  repo_genero = RepositorioGenero(conexion)
+  repo_editorial = RepositorioEditorial(conexion)
+  repo_moneda = RepositorioMoneda(conexion)
+  repo_tipo = RepositorioTipoCotizacion(conexion)
+  repo_libro = RepositorioLibro(conexion)
+  repo_precio = RepositorioPrecio(conexion)
+  repo_stock = RepositorioStock(conexion)
+  repo_cotizacion = RepositorioCotizacionDolar(conexion)
+
+  servicio_cotizacion = ServicioCotizacionDolar(
     repo_cotizacion, repo_tipo
   )
   servicio_precio = ServicioPrecio(
-    repo_precio, repo_moneda, servicio_cotizacion
+    repo_precio, repo_moneda, repo_libro, servicio_cotizacion
   )
   servicio_stock = ServicioStock(repo_stock)
   servicio_libro = ServicioLibro(
     repo_libro, repo_precio, repo_stock
   )
-  # servicio_comparacion = ServicioComparacionCompetencia(
-  #   repo_libro
-  # )  # deshabilitada (Tema 9)
   servicio_reportes = ServicioReportes(
     repo_libro, repo_stock, servicio_precio
   )
 
-  if import_default_data and not repo_libro.leer_todos():
-    cargar_datos_iniciales(
-      repo_genero,
-      repo_editorial,
-      repo_moneda,
-      repo_tipo,
-      servicio_libro,
-      servicio_cotizacion,
-    )
+  if import_default_data or not repo_libro.leer_todos():
+    generar_csvs_iniciales()
+    migrar_datos(RUTA_CSV, RUTA_SQL, conexion)
+    print("Datos migrados correctamente a la base de datos.")
 
   while True:
     print(OPCIONES_MENU)
     opcion: str = input("Seleccione una opción: ").strip()
 
-    if opcion == "1":
-      menu_generos(repo_genero)
-    elif opcion == "2":
-      menu_editoriales(repo_editorial)
-    elif opcion == "3":
-      menu_monedas(repo_moneda)
-    elif opcion == "4":
-      menu_tipos_cotizacion(repo_tipo)
-    elif opcion == "5":
-      menu_libros(
-        servicio_libro, repo_libro, repo_editorial,
-        repo_genero, repo_moneda,
-      )
-    elif opcion == "6":
-      menu_precios(
-        servicio_precio, servicio_cotizacion, repo_precio,
-        repo_libro, repo_tipo,
-      )
-    elif opcion == "7":
-      menu_stock(servicio_stock, repo_stock)
-    elif opcion == "8":
-      menu_cotizaciones(
-        servicio_cotizacion, repo_cotizacion, repo_tipo
-      )
-    elif opcion == "9":
-      reporte_bajo_stock(servicio_reportes)
-    # elif opcion == "10":  # deshabilitada (Tema 9, web scraping)
-    #   reporte_comparacion_competencia(
-    #     servicio_comparacion, servicio_precio, repo_libro
-    #   )
-    elif opcion == "10":
-      reporte_catalogo(servicio_reportes)
-    elif opcion == "0":
-      print("Saliendo del sistema. ¡Hasta luego!")
-      break
-    else:
-      print("Opción inválida, intente de nuevo.")
+    try:
+      if opcion == "1":
+        menu_generos(repo_genero)
+      elif opcion == "2":
+        menu_editoriales(repo_editorial)
+      elif opcion == "3":
+        menu_monedas(repo_moneda)
+      elif opcion == "4":
+        menu_tipos_cotizacion(repo_tipo)
+      elif opcion == "5":
+        menu_libros(
+          servicio_libro, repo_libro, repo_editorial,
+          repo_genero, repo_moneda,
+        )
+      elif opcion == "6":
+        menu_precios(
+          servicio_precio, servicio_cotizacion, repo_precio,
+          repo_libro, repo_tipo,
+        )
+      elif opcion == "7":
+        menu_stock(servicio_stock, repo_stock)
+      elif opcion == "8":
+        menu_cotizaciones(
+          servicio_cotizacion, repo_cotizacion, repo_tipo
+        )
+      elif opcion == "9":
+        reporte_bajo_stock(servicio_reportes)
+      elif opcion == "10":
+        reporte_catalogo(servicio_reportes)
+      elif opcion == "11":
+        opcion_obtener_cotizaciones(servicio_cotizacion)
+      elif opcion == "12":
+        reporte_precios_bimonetarios(servicio_precio, repo_moneda)
+      elif opcion == "13":
+        exportar_precios(servicio_precio)
+      elif opcion == "0":
+        print("Saliendo del sistema. ¡Hasta luego!")
+        break
+      else:
+        print("Opción inválida, intente de nuevo.")
+    except ValueError as error:
+      print(f"Entrada o dato inválido: {error}")
 
 
 if __name__ == "__main__":
