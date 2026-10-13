@@ -1,0 +1,150 @@
+"""Migración de datos desde archivos CSV hacia la base de datos."""
+from __future__ import annotations
+
+import csv
+import os
+from typing import Dict, List, Optional, Tuple
+
+from sqlalchemy import text
+
+from book_manager.database.connection import ConexionDB
+import book_manager.models.models  # noqa: F401
+
+RUTA_CSV: str = os.path.join(
+  os.path.dirname(os.path.abspath(__file__)), "csv"
+)
+RUTA_SQL: str = os.path.join(
+  os.path.dirname(os.path.abspath(__file__)), "sql"
+)
+
+# Orden de migración respetando las claves foráneas:
+# archivo CSV -> (tabla, columnas con su tipo).
+TABLAS: List[Tuple[str, str, Dict[str, str]]] = [
+  ("generos.csv", "generos", {"id": "int", "nombre": "str"}),
+  (
+    "editoriales.csv", "editoriales",
+    {"id": "int", "nombre": "str", "pais": "str"},
+  ),
+  (
+    "monedas.csv", "monedas",
+    {"id": "int", "codigo": "str", "nombre": "str"},
+  ),
+  (
+    "tipos_cotizacion.csv", "tipos_cotizacion",
+    {"id": "int", "nombre": "str"},
+  ),
+  (
+    "libros.csv", "libros",
+    {
+      "id": "int", "isbn": "str", "titulo": "str", "autor": "str",
+      "editorial_id": "int", "genero_id": "int",
+    },
+  ),
+  (
+    "precios.csv", "precios",
+    {
+      "id": "int", "libro_id": "int", "moneda_id": "int",
+      "monto": "float",
+    },
+  ),
+  (
+    "stocks.csv", "stocks",
+    {"id": "int", "libro_id": "int", "cantidad": "int"},
+  ),
+  (
+    "cotizaciones.csv", "cotizaciones",
+    {
+      "id": "int", "tipo_id": "int", "fecha": "str",
+      "valor_compra": "float", "valor_venta": "float",
+    },
+  ),
+]
+
+
+def _literal_sql(valor: str, tipo: str) -> str:
+  """Convierte un valor del CSV en un literal SQL."""
+  if tipo == "int":
+    return str(int(valor))
+  if tipo == "float":
+    return str(float(valor))
+  return "'" + valor.replace("'", "''") + "'"
+
+
+def _generar_inserts(
+  ruta_csv: str, tabla: str, columnas: Dict[str, str]
+) -> List[str]:
+  """Genera una sentencia INSERT por cada fila de un CSV."""
+  sentencias: List[str] = []
+  with open(ruta_csv, "r", newline="", encoding="utf-8") as f:
+    for fila in csv.DictReader(f):
+      valores: str = ", ".join(
+        _literal_sql(fila[col], tipo)
+        for col, tipo in columnas.items()
+      )
+      sentencias.append(
+        f"INSERT INTO {tabla} "
+        f"({', '.join(columnas)}) VALUES ({valores}) "
+        "ON CONFLICT DO NOTHING;"
+      )
+  return sentencias
+
+
+def _ejecutar_sql(
+  conexion: ConexionDB, ruta_sql: str
+) -> int:
+  """Ejecuta las sentencias de un archivo .sql y cuenta filas."""
+  with open(ruta_sql, "r", encoding="utf-8") as f:
+    sentencias: List[str] = [
+      linea.strip() for linea in f if linea.strip()
+    ]
+  with conexion.transaccion() as sesion:
+    for sentencia in sentencias:
+      sesion.execute(text(sentencia))
+  return len(sentencias)
+
+
+def _reiniciar_secuencias(conexion: ConexionDB) -> None:
+  """Ajusta las secuencias de id tras insertar ids explícitos."""
+  with conexion.transaccion() as sesion:
+    for _, tabla, _ in TABLAS:
+      sesion.execute(text(
+        f"SELECT setval(pg_get_serial_sequence('{tabla}', 'id'), "
+        f"COALESCE(MAX(id), 1), MAX(id) IS NOT NULL) FROM {tabla};"
+      ))
+
+
+def migrar_datos(
+  carpeta_csvs: str,
+  carpeta_sqls: str,
+  conexion: Optional[ConexionDB] = None,
+) -> Dict[str, int]:
+  """Migra los CSV a la base generando un archivo .sql por tabla.
+
+  Args:
+    carpeta_csvs: Carpeta donde están los archivos CSV de origen.
+    carpeta_sqls: Carpeta donde se guardan los archivos SQL.
+    conexion: Conexión a la base; si no se indica crea una nueva.
+
+  Returns:
+    Cantidad de sentencias ejecutadas por tabla.
+  """
+  conexion = conexion or ConexionDB()
+  conexion.crear_tablas()
+  os.makedirs(carpeta_sqls, exist_ok=True)
+
+  resumen: Dict[str, int] = {}
+  for orden, (archivo, tabla, columnas) in enumerate(TABLAS, 1):
+    ruta_csv: str = os.path.join(carpeta_csvs, archivo)
+    if not os.path.exists(ruta_csv):
+      continue
+    sentencias: List[str] = _generar_inserts(
+      ruta_csv, tabla, columnas
+    )
+    ruta_sql: str = os.path.join(
+      carpeta_sqls, f"{orden:02d}_{tabla}.sql"
+    )
+    with open(ruta_sql, "w", encoding="utf-8") as f:
+      f.write("\n".join(sentencias) + "\n")
+    resumen[tabla] = _ejecutar_sql(conexion, ruta_sql)
+  _reiniciar_secuencias(conexion)
+  return resumen

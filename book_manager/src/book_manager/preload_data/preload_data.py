@@ -1,30 +1,21 @@
-"""Carga de datos de ejemplo para el sistema Book Manager."""
+"""Datos iniciales del sistema Book Manager para la migración."""
 from __future__ import annotations
 
-# import csv  # solo usado por _generar_csv_competencia (deshabilitada)
+import csv
 import os
+from datetime import date
 from typing import Dict, List, Tuple
 
-from book_manager.entities.entities import (
-  Editorial, Genero, Moneda, TipoCotizacion,
-)
-from book_manager.repositories.repositories import (
-  RepositorioCotizacionDolar,
-  RepositorioEditorial,
-  RepositorioGenero,
-  RepositorioMoneda,
-  RepositorioTipoCotizacion,
-)
-from book_manager.services.services import (
-  ServicioCotizacion, ServicioLibro,
+RUTA_CSV: str = os.path.join(
+  os.path.dirname(os.path.abspath(__file__)),
+  "..", "migrations", "csv",
 )
 
-# RUTA_COMPETENCIA: solo usada por _generar_csv_competencia,
-# deshabilitada (ver más abajo).
-# RUTA_COMPETENCIA: str = os.path.join(
-#   os.path.dirname(__file__),
-#   "..", "migrations", "csv", "competencia.csv",
-# )
+MONEDAS: List[Tuple[str, str]] = [
+  ("ARS", "Peso Argentino"),
+  ("USD", "Dólar Estadounidense"),
+  ("EUR", "Euro"),
+]
 
 GENEROS: List[str] = [
   "Novela", "Ensayo", "Infantil", "Técnico", "Poesía",
@@ -82,90 +73,72 @@ LIBROS: List[Tuple] = [
    9, 9, 6500.0, 6.5),
 ]
 
-# DESHABILITADO: comparación con competencia (web scraping,
-# Tema 9, no visto en la cursada). Se deja comentado.
-# # Precios de referencia de la competencia (Cúspide): ARS y USD.
-# COMPETENCIA: List[Tuple[str, float, float]] = [
-#   ("978-1", 12500.0, 12.5),
-#   ("978-2", 9200.0, 9.2),
-#   ("978-3", 5800.0, 5.8),
-#   ("978-4", 14500.0, 14.5),
-#   ("978-5", 8900.0, 8.9),
-#   ("978-6", 6800.0, 6.8),
-#   ("978-7", 7500.0, 7.5),
-#   ("978-8", 10500.0, 10.5),
-#   ("978-9", 10200.0, 10.2),
-#   ("978-10", 6200.0, 6.2),
-# ]
 
-
-def cargar_datos_iniciales(
-  repo_genero: RepositorioGenero,
-  repo_editorial: RepositorioEditorial,
-  repo_moneda: RepositorioMoneda,
-  repo_tipo: RepositorioTipoCotizacion,
-  servicio_libro: ServicioLibro,
-  servicio_cotizacion: ServicioCotizacion,
+def _escribir_csv(
+  carpeta: str,
+  archivo: str,
+  encabezados: List[str],
+  filas: List[List],
 ) -> None:
-  """Puebla el sistema con datos de ejemplo (mínimo 10 c/u)."""
-  mapa_generos: Dict[int, Genero] = {}
-  for i, nombre in enumerate(GENEROS):
-    mapa_generos[i] = repo_genero.crear(Genero(nombre=nombre))
+  """Escribe un archivo CSV con encabezados y filas."""
+  ruta: str = os.path.join(carpeta, archivo)
+  with open(ruta, "w", newline="", encoding="utf-8") as f:
+    escritor = csv.writer(f)
+    escritor.writerow(encabezados)
+    escritor.writerows(filas)
 
-  mapa_editoriales: Dict[int, Editorial] = {}
-  for i, (nombre, pais) in enumerate(EDITORIALES):
-    mapa_editoriales[i] = repo_editorial.crear(
-      Editorial(nombre=nombre, pais=pais)
-    )
 
-  moneda_ars: Moneda = repo_moneda.crear(
-    Moneda(codigo="ARS", nombre="Peso Argentino")
+def generar_csvs_iniciales(carpeta: str = RUTA_CSV) -> None:
+  """Genera los CSV de origen (formato del Sprint 1) si no existen."""
+  if os.path.exists(os.path.join(carpeta, "libros.csv")):
+    return
+  os.makedirs(carpeta, exist_ok=True)
+  hoy: str = date.today().isoformat()
+
+  _escribir_csv(
+    carpeta, "generos.csv", ["id", "nombre"],
+    [[i, n] for i, n in enumerate(GENEROS, 1)],
   )
-  moneda_usd: Moneda = repo_moneda.crear(
-    Moneda(codigo="USD", nombre="Dólar Estadounidense")
+  _escribir_csv(
+    carpeta, "editoriales.csv", ["id", "nombre", "pais"],
+    [[i, n, p] for i, (n, p) in enumerate(EDITORIALES, 1)],
   )
-  repo_moneda.crear(Moneda(codigo="EUR", nombre="Euro"))
+  _escribir_csv(
+    carpeta, "monedas.csv", ["id", "codigo", "nombre"],
+    [[i, c, n] for i, (c, n) in enumerate(MONEDAS, 1)],
+  )
+  _escribir_csv(
+    carpeta, "tipos_cotizacion.csv", ["id", "nombre"],
+    [[i, n] for i, n in enumerate(TIPOS_COTIZACION, 1)],
+  )
+  _escribir_csv(
+    carpeta, "cotizaciones.csv",
+    ["id", "tipo_id", "fecha", "valor_compra", "valor_venta"],
+    [
+      [i, i, hoy, *COTIZACIONES_INICIALES[nombre]]
+      for i, nombre in enumerate(TIPOS_COTIZACION, 1)
+    ],
+  )
 
-  mapa_tipos: Dict[str, TipoCotizacion] = {}
-  for nombre_tipo in TIPOS_COTIZACION:
-    mapa_tipos[nombre_tipo] = repo_tipo.crear(
-      TipoCotizacion(nombre=nombre_tipo)
-    )
-
-  for nombre_tipo, (compra, venta) in COTIZACIONES_INICIALES.items():
-    servicio_cotizacion.registrar_cotizacion(
-      tipo_id=mapa_tipos[nombre_tipo].id,
-      valor_compra=compra,
-      valor_venta=venta,
-    )
-
-  for (
-    isbn, titulo, autor, ed_idx, gen_idx, precio_ars, precio_usd
-  ) in LIBROS:
-    servicio_libro.registrar_libro(
-      isbn=isbn,
-      titulo=titulo,
-      autor=autor,
-      editorial=mapa_editoriales[ed_idx],
-      genero=mapa_generos[gen_idx],
-      precio_ars=precio_ars,
-      precio_usd=precio_usd,
-      moneda_ars=moneda_ars,
-      moneda_usd=moneda_usd,
-      cantidad_inicial=10,
-    )
-
-  # _generar_csv_competencia()  # deshabilitado (ver Tema 9)
-  print("Datos iniciales cargados correctamente.")
-
-
-# def _generar_csv_competencia() -> None:
-#   """Genera el CSV con precios ARS/USD de la competencia."""
-#   os.makedirs(os.path.dirname(RUTA_COMPETENCIA), exist_ok=True)
-#   with open(
-#     RUTA_COMPETENCIA, "w", newline="", encoding="utf-8"
-#   ) as f:
-#     escritor = csv.writer(f)
-#     escritor.writerow(["isbn", "precio_ars", "precio_usd"])
-#     for isbn, precio_ars, precio_usd in COMPETENCIA:
-#       escritor.writerow([isbn, precio_ars, precio_usd])
+  libros: List[List] = []
+  precios: List[List] = []
+  stocks: List[List] = []
+  for i, (isbn, titulo, autor, ed, gen, ars, usd) in enumerate(
+    LIBROS, 1
+  ):
+    libros.append([i, isbn, titulo, autor, ed + 1, gen + 1])
+    precios.append([len(precios) + 1, i, 1, ars])
+    precios.append([len(precios) + 1, i, 2, usd])
+    stocks.append([i, i, 10])
+  _escribir_csv(
+    carpeta, "libros.csv",
+    ["id", "isbn", "titulo", "autor", "editorial_id", "genero_id"],
+    libros,
+  )
+  _escribir_csv(
+    carpeta, "precios.csv",
+    ["id", "libro_id", "moneda_id", "monto"], precios,
+  )
+  _escribir_csv(
+    carpeta, "stocks.csv", ["id", "libro_id", "cantidad"], stocks
+  )
