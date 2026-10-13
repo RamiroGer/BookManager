@@ -1,3 +1,10 @@
+## [Ejercicio 05 - Sprint 2]
+- preload_data genera los CSV de origen si no existen.
+- migrar_datos lee los CSV, genera un .sql por tabla y los ejecuta.
+- Migración idempotente con ON CONFLICT DO NOTHING y ajuste de secuencias.
+- Filas huérfanas de los CSV omitidas con aviso.
+- Archivos .sql guardados en migrations/sql.
+
 ## [Ejercicio 04 - Sprint 2]
 - Modelos ORM para las 8 tablas del sistema.
 - Relaciones entre libro, género, editorial, precio, stock y moneda.

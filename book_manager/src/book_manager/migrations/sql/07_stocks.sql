@@ -1,0 +1,10 @@
+INSERT INTO stocks (id, libro_id, cantidad) VALUES (1, 1, 10) ON CONFLICT DO NOTHING;
+INSERT INTO stocks (id, libro_id, cantidad) VALUES (2, 2, 10) ON CONFLICT DO NOTHING;
+INSERT INTO stocks (id, libro_id, cantidad) VALUES (3, 3, 10) ON CONFLICT DO NOTHING;
+INSERT INTO stocks (id, libro_id, cantidad) VALUES (4, 4, 10) ON CONFLICT DO NOTHING;
+INSERT INTO stocks (id, libro_id, cantidad) VALUES (5, 5, 10) ON CONFLICT DO NOTHING;
+INSERT INTO stocks (id, libro_id, cantidad) VALUES (6, 6, 10) ON CONFLICT DO NOTHING;
+INSERT INTO stocks (id, libro_id, cantidad) VALUES (7, 7, 10) ON CONFLICT DO NOTHING;
+INSERT INTO stocks (id, libro_id, cantidad) VALUES (8, 8, 10) ON CONFLICT DO NOTHING;
+INSERT INTO stocks (id, libro_id, cantidad) VALUES (9, 9, 10) ON CONFLICT DO NOTHING;
+INSERT INTO stocks (id, libro_id, cantidad) VALUES (10, 10, 10) ON CONFLICT DO NOTHING;
