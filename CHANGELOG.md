@@ -1,3 +1,6 @@
+## [Ejercicio 08 - README Sprint 2]
+- README actualizado con objetivo, contexto y decisiones de diseño.
+
 ## [Ejercicio 08 - Sprint 2]
 - Opción 11: obtener las cotizaciones por API.
 - Opción 12: lista de precios en pesos y otra moneda elegida.

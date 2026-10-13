@@ -1,82 +1,62 @@
 # Book Manager
 
-## Sprint 1
+## Sprint 2
 
 ### Objetivo
 
-Aplicar los conocimientos de programación orientada a objetos y
-persistencia de datos en archivos para modernizar el sistema de
-inventario de una librería, tomando como referencia el sitio
-[Cúspide](https://www.cuspide.com/).
+Persistir el sistema en una base de datos relacional con el ORM
+SQLAlchemy, migrar los datos cargados en archivos CSV a tablas
+relacionales y consultar una API externa para obtener la cotización
+del dólar. Se consolidan las bases de manejo de bases de datos,
+normalización, conexión segura y carga inicial.
 
-### Contexto
+### Introducción y contexto
 
-Una librería con venta al público necesita gestionar su
-inventario de libros, cotizar precios en distintas monedas
-siguiendo la cotización del dólar, y comparar esos precios
-contra la competencia web.
+Una librería con venta al público gestiona su inventario de libros
+tomando como referencia el sitio [Cúspide](https://www.cuspide.com/).
+En el Sprint 1 el sistema guardaba todo en archivos CSV. En este
+sprint, partiendo del último push del Sprint 1 (rama `Sprint_1`), se
+trabaja sobre la rama `Sprint_2` para que toda la aplicación use una
+base de datos PostgreSQL en Supabase.
 
-El sistema se implementa como una aplicación de consola (CLI) en
-Python puro (solo librería estándar, sin instalar paquetes),
-aplicando:
+### Qué cambió respecto del Sprint 1
 
-- Programación orientada a objetos con encapsulación mediante
-  properties.
-- Persistencia en archivos CSV a través del patrón Repository,
-  con una interfaz genérica `IRepositorio`.
-- Servicios de lógica de negocio separados de la persistencia y
-  de la interfaz de usuario.
-- Cada libro se carga con precio en ARS y en USD, tal como
-  los muestra Cúspide.
-- Cotización del dólar cargada manualmente, sin API (ver
-  sección siguiente).
+- `database/connection.py`: clase `ConexionDB` y context manager
+  `transaccion()` (commit al finalizar, rollback ante error).
+- `models/models.py`: ocho tablas con claves foráneas, restricciones
+  `unique` y borrado en cascada de precios y stock de un libro.
+- `migrations/migrations.py`: `migrar_datos` lee los CSV, genera un
+  archivo `.sql` por tabla en `migrations/sql` y los ejecuta.
+- `repositories/repositories.py`: mismos repositorios del Sprint 1
+  pero sobre la base, por lo que servicios y consola casi no cambian.
+- `services/services.py`: `ServicioCotizacionDolar.obtener_cotizaciones`
+  descarga las cotizaciones de DolarAPI y las registra.
+- `ui/console.py`: tres opciones nuevas (obtener cotizaciones por
+  API, lista de precios bimonetaria y exportación de precios a CSV).
 
-### Decisión de diseño: cotización del dólar (sin API)
+### Decisiones de diseño
 
-El enunciado menciona seguir de cerca la cotización del dólar. La
-consigna del trabajo indica resolverlo **sin API**, por lo que el
-sistema no consulta ningún servicio externo: las cotizaciones se
-cargan manualmente desde la opción "Cotizaciones del Dólar" del
-menú (o al precargar datos, con un valor de referencia por tipo) y
-se guardan con su fecha, formando un histórico por tipo.
+**Supabase (PostgreSQL).** La base es un servicio en la nube del
+proyecto del grupo. La URL y la contraseña se cargan en una celda de
+credenciales, nunca en el código, y `ConexionDB` las toma del entorno.
 
-Con la última cotización registrada se calcula el precio ARS
-sugerido de cada libro (precio USD x cotización de venta) y se lo
-compara contra el precio ARS vigente.
+**Entidades y modelos separados.** Las entidades POO del Sprint 1
+no cambian. Los repositorios traducen entre el modelo de SQLAlchemy y
+la entidad de dominio.
 
-La versión que consultaba [DolarAPI](https://dolarapi.com/) con
-`urllib.request` no se eliminó: quedó **comentada** en
-`services.py` (`obtener_cotizacion_automatica`) y en `console.py`,
-para poder habilitarla en un sprint futuro.
+**Migración idempotente.** Los `.sql` usan `INSERT ... ON CONFLICT DO
+NOTHING`, de modo que ejecutar la migración varias veces no duplica
+datos. Después de migrar se ajustan las secuencias de los ids. Las filas que referencian un registro inexistente (por ejemplo, un precio de un libro borrado en el Sprint 1) se omiten con un aviso, para no violar las claves foráneas.
+`main()` migra los CSV automáticamente cuando la base está vacía.
 
-### Decisión de diseño: comparación con la competencia
-(funcionalidad deshabilitada)
+**API del dólar.** La URL se lee del archivo `.env` (`API_URL`) con
+`python-dotenv`. Los nombres de la API se normalizan a los del
+sistema (Bolsa a MEP, Contado con liquidación a CCL). Si falla la
+conexión se informa el error y se puede cargar la cotización a mano,
+para que el sistema nunca dependa de un servicio externo.
 
-El enunciado menciona "comparar precios automáticamente con la
-competencia web", lo cual en la práctica requiere técnicas de
-web scraping. Ese tema (Tema 9) todavía no fue visto en la
-cursada, y usar herramientas no vistas está fuera de lo permitido
-por la consigna.
-
-Por ese motivo, se diseñó e implementó la funcionalidad completa
-(`ServicioComparacionCompetencia`, el archivo de referencia
-`migrations/csv/competencia.csv` con precios simulados en ARS y
-USD, y el reporte correspondiente en la consola), pero se dejó
-**comentada** en el código en vez de eliminarla, para poder
-habilitarla fácilmente en un sprint futuro una vez visto el tema.
-Por este motivo la opción de menú "Comparación con Competencia"
-no está disponible en esta entrega.
-
-### Decisión de diseño: aplicar el precio sugerido
-
-Varios libros no contaban con un precio calculado para ciertos
-tipos de cotización (Oficial, Blue, etc.), ya que originalmente
-solo se cargaban con un precio ARS y USD de referencia (Cúspide).
-Para resolverlo, la opción de Precios permite elegir un libro y un
-tipo de cotización: si no hay una cotización registrada para ese
-tipo, el sistema la pide en el momento por consola. Con la cotización
-obtenida, calcula el precio ARS sugerido y ofrece aplicarlo
-directamente al libro, actualizando el precio vigente.
+**Comparación con la competencia.** Sigue deshabilitada: requiere web
+scraping (Tema 9), que todavía no se vio en la cursada.
 
 ### Estructura del proyecto
 
@@ -84,14 +64,31 @@ directamente al libro, actualizando el precio vigente.
 book_manager/
 ├── src/
 │   └── book_manager/
+│       ├── database/       # ConexionDB y transacciones
 │       ├── entities/       # Modelo de dominio (POO)
-│       ├── repositories/   # Persistencia CSV (patrón Repository)
-│       ├── services/       # Lógica de negocio
-│       ├── preload_data/   # Datos de ejemplo
-│       ├── migrations/csv/ # Archivos CSV de persistencia
+│       ├── models/         # Tablas de SQLAlchemy
+│       ├── preload_data/   # Datos de origen para la migración
+│       ├── repositories/   # Persistencia en base de datos
+│       ├── services/       # Lógica de negocio y API del dólar
+│       ├── migrations/     # migrar_datos, csv/ y sql/
 │       ├── ui/             # Interfaz de consola (CLI)
 │       └── main.py         # Punto de entrada
+├── .env
 ├── CHANGELOG.md
 ├── README.md
 └── requirements.txt
 ```
+
+### Ejecución
+
+```python
+from book_manager.main import main
+main(import_default_data=False)
+```
+
+### Sprint 1
+
+Persistencia en archivos CSV con el patrón Repository, entidades con
+encapsulamiento mediante properties, servicios de negocio y una
+interfaz de consola con CRUD completo. La comparación con la
+competencia quedó deshabilitada por requerir web scraping.
