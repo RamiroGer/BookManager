@@ -2,12 +2,11 @@
 from __future__ import annotations
 
 import os
-from contextlib import contextmanager
-from typing import Iterator, Optional
+from typing import Optional
 
 from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
-from sqlalchemy.orm import Session, declarative_base, sessionmaker
+from sqlalchemy.orm import declarative_base, sessionmaker
 
 Base = declarative_base()
 
@@ -39,16 +38,3 @@ class ConexionDB:
     import book_manager.models.models  # noqa: F401
 
     Base.metadata.create_all(self._engine)
-
-  @contextmanager
-  def transaccion(self) -> Iterator[Session]:
-    """Abre una sesión y confirma o revierte la transacción."""
-    sesion: Session = self._fabrica_sesiones()
-    try:
-      yield sesion
-      sesion.commit()
-    except Exception:
-      sesion.rollback()
-      raise
-    finally:
-      sesion.close()
