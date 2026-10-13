@@ -79,22 +79,28 @@ PADRES_FK: Dict[str, str] = {
 }
 
 
+def _ids_en_base(conexion: ConexionDB, tabla: str) -> Set[str]:
+  """Devuelve los ids que realmente existen en una tabla de la base."""
+  with conexion.transaccion() as sesion:
+    filas = sesion.execute(text(f"SELECT id FROM {tabla};")).scalars()
+    return {str(id_) for id_ in filas}
+
+
 def _generar_inserts(
   ruta_csv: str,
   tabla: str,
   columnas: Dict[str, str],
   ids_padres: Dict[str, Set[str]],
-) -> Tuple[List[str], Set[str], int]:
+) -> Tuple[List[str], int]:
   """Genera un INSERT por fila válida y cuenta las filas huérfanas.
 
   Una fila es huérfana si referencia un id que no existe en la tabla
   padre; se omite para no romper la clave foránea.
 
   Returns:
-    Sentencias generadas, ids insertados y cantidad de filas omitidas.
+    Sentencias generadas y cantidad de filas omitidas.
   """
   sentencias: List[str] = []
-  ids_insertados: Set[str] = set()
   huerfanas: int = 0
   with open(ruta_csv, "r", newline="", encoding="utf-8") as f:
     for fila in csv.DictReader(f):
@@ -106,7 +112,6 @@ def _generar_inserts(
       if referencias_rotas:
         huerfanas += 1
         continue
-      ids_insertados.add(fila["id"])
       valores: str = ", ".join(
         _literal_sql(fila[col], tipo)
         for col, tipo in columnas.items()
@@ -116,7 +121,7 @@ def _generar_inserts(
         f"({', '.join(columnas)}) VALUES ({valores}) "
         "ON CONFLICT DO NOTHING;"
       )
-  return sentencias, ids_insertados, huerfanas
+  return sentencias, huerfanas
 
 
 def _ejecutar_sql(
@@ -163,20 +168,22 @@ def migrar_datos(
   os.makedirs(carpeta_sqls, exist_ok=True)
 
   resumen: Dict[str, int] = {}
-  ids_migrados: Dict[str, Set[str]] = {}
   for orden, (archivo, tabla, columnas) in enumerate(TABLAS, 1):
     ruta_csv: str = os.path.join(carpeta_csvs, archivo)
     if not os.path.exists(ruta_csv):
       continue
-    sentencias, ids_validos, huerfanas = _generar_inserts(
-      ruta_csv, tabla, columnas, ids_migrados
+    ids_padres: Dict[str, Set[str]] = {
+      padre: _ids_en_base(conexion, padre)
+      for padre in PADRES_FK.values()
+    }
+    sentencias, huerfanas = _generar_inserts(
+      ruta_csv, tabla, columnas, ids_padres
     )
     if huerfanas:
       print(
         f"Aviso: {tabla}: {huerfanas} filas omitidas por "
-        "referenciar registros inexistentes."
+        "referenciar registros inexistentes en la base."
       )
-    ids_migrados[tabla] = ids_validos
     ruta_sql: str = os.path.join(
       carpeta_sqls, f"{orden:02d}_{tabla}.sql"
     )
