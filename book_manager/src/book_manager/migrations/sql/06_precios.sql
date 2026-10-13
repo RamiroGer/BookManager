@@ -1,0 +1,12 @@
+INSERT INTO precios (id, libro_id, moneda_id, monto) VALUES (1, 1, 1, 12000.0) ON CONFLICT DO NOTHING;
+INSERT INTO precios (id, libro_id, moneda_id, monto) VALUES (2, 2, 1, 9500.0) ON CONFLICT DO NOTHING;
+INSERT INTO precios (id, libro_id, moneda_id, monto) VALUES (3, 3, 1, 5500.0) ON CONFLICT DO NOTHING;
+INSERT INTO precios (id, libro_id, moneda_id, monto) VALUES (4, 4, 1, 15000.0) ON CONFLICT DO NOTHING;
+INSERT INTO precios (id, libro_id, moneda_id, monto) VALUES (5, 5, 1, 8500.0) ON CONFLICT DO NOTHING;
+INSERT INTO precios (id, libro_id, moneda_id, monto) VALUES (6, 6, 1, 7000.0) ON CONFLICT DO NOTHING;
+INSERT INTO precios (id, libro_id, moneda_id, monto) VALUES (7, 7, 1, 7200.0) ON CONFLICT DO NOTHING;
+INSERT INTO precios (id, libro_id, moneda_id, monto) VALUES (8, 8, 1, 11000.0) ON CONFLICT DO NOTHING;
+INSERT INTO precios (id, libro_id, moneda_id, monto) VALUES (9, 9, 1, 9800.0) ON CONFLICT DO NOTHING;
+INSERT INTO precios (id, libro_id, moneda_id, monto) VALUES (10, 10, 1, 6500.0) ON CONFLICT DO NOTHING;
+INSERT INTO precios (id, libro_id, moneda_id, monto) VALUES (11, 11, 1, 5000.0) ON CONFLICT DO NOTHING;
+INSERT INTO precios (id, libro_id, moneda_id, monto) VALUES (12, 11, 2, 5.0) ON CONFLICT DO NOTHING;

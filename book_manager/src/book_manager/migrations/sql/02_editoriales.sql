@@ -1,0 +1,10 @@
+INSERT INTO editoriales (id, nombre, pais) VALUES (1, 'Planeta', 'Argentina') ON CONFLICT DO NOTHING;
+INSERT INTO editoriales (id, nombre, pais) VALUES (2, 'Sudamericana', 'Argentina') ON CONFLICT DO NOTHING;
+INSERT INTO editoriales (id, nombre, pais) VALUES (3, 'Penguin Random House', 'España') ON CONFLICT DO NOTHING;
+INSERT INTO editoriales (id, nombre, pais) VALUES (4, 'Anagrama', 'España') ON CONFLICT DO NOTHING;
+INSERT INTO editoriales (id, nombre, pais) VALUES (5, 'Alfaguara', 'España') ON CONFLICT DO NOTHING;
+INSERT INTO editoriales (id, nombre, pais) VALUES (6, 'Paidós', 'Argentina') ON CONFLICT DO NOTHING;
+INSERT INTO editoriales (id, nombre, pais) VALUES (7, 'Emecé', 'Argentina') ON CONFLICT DO NOTHING;
+INSERT INTO editoriales (id, nombre, pais) VALUES (8, 'Siglo XXI', 'Argentina') ON CONFLICT DO NOTHING;
+INSERT INTO editoriales (id, nombre, pais) VALUES (9, 'Tusquets', 'España') ON CONFLICT DO NOTHING;
+INSERT INTO editoriales (id, nombre, pais) VALUES (10, 'Edhasa', 'Argentina') ON CONFLICT DO NOTHING;

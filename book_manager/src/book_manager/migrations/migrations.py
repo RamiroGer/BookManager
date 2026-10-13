@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import csv
 import os
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Set, Tuple
 
 from sqlalchemy import text
 
@@ -70,13 +70,43 @@ def _literal_sql(valor: str, tipo: str) -> str:
   return "'" + valor.replace("'", "''") + "'"
 
 
+PADRES_FK: Dict[str, str] = {
+  "editorial_id": "editoriales",
+  "genero_id": "generos",
+  "libro_id": "libros",
+  "moneda_id": "monedas",
+  "tipo_id": "tipos_cotizacion",
+}
+
+
 def _generar_inserts(
-  ruta_csv: str, tabla: str, columnas: Dict[str, str]
-) -> List[str]:
-  """Genera una sentencia INSERT por cada fila de un CSV."""
+  ruta_csv: str,
+  tabla: str,
+  columnas: Dict[str, str],
+  ids_padres: Dict[str, Set[str]],
+) -> Tuple[List[str], Set[str], int]:
+  """Genera un INSERT por fila válida y cuenta las filas huérfanas.
+
+  Una fila es huérfana si referencia un id que no existe en la tabla
+  padre; se omite para no romper la clave foránea.
+
+  Returns:
+    Sentencias generadas, ids insertados y cantidad de filas omitidas.
+  """
   sentencias: List[str] = []
+  ids_insertados: Set[str] = set()
+  huerfanas: int = 0
   with open(ruta_csv, "r", newline="", encoding="utf-8") as f:
     for fila in csv.DictReader(f):
+      referencias_rotas: bool = any(
+        fila[col] not in ids_padres.get(PADRES_FK[col], set())
+        for col in columnas
+        if col in PADRES_FK
+      )
+      if referencias_rotas:
+        huerfanas += 1
+        continue
+      ids_insertados.add(fila["id"])
       valores: str = ", ".join(
         _literal_sql(fila[col], tipo)
         for col, tipo in columnas.items()
@@ -86,7 +116,7 @@ def _generar_inserts(
         f"({', '.join(columnas)}) VALUES ({valores}) "
         "ON CONFLICT DO NOTHING;"
       )
-  return sentencias
+  return sentencias, ids_insertados, huerfanas
 
 
 def _ejecutar_sql(
@@ -133,13 +163,20 @@ def migrar_datos(
   os.makedirs(carpeta_sqls, exist_ok=True)
 
   resumen: Dict[str, int] = {}
+  ids_migrados: Dict[str, Set[str]] = {}
   for orden, (archivo, tabla, columnas) in enumerate(TABLAS, 1):
     ruta_csv: str = os.path.join(carpeta_csvs, archivo)
     if not os.path.exists(ruta_csv):
       continue
-    sentencias: List[str] = _generar_inserts(
-      ruta_csv, tabla, columnas
+    sentencias, ids_validos, huerfanas = _generar_inserts(
+      ruta_csv, tabla, columnas, ids_migrados
     )
+    if huerfanas:
+      print(
+        f"Aviso: {tabla}: {huerfanas} filas omitidas por "
+        "referenciar registros inexistentes."
+      )
+    ids_migrados[tabla] = ids_validos
     ruta_sql: str = os.path.join(
       carpeta_sqls, f"{orden:02d}_{tabla}.sql"
     )

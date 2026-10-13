@@ -1,0 +1,11 @@
+INSERT INTO libros (id, isbn, titulo, autor, editorial_id, genero_id) VALUES (1, '978-1', 'Cien Años de Soledad', 'Gabriel García Márquez', 1, 1) ON CONFLICT DO NOTHING;
+INSERT INTO libros (id, isbn, titulo, autor, editorial_id, genero_id) VALUES (2, '978-2', 'Rayuela', 'Julio Cortázar', 2, 1) ON CONFLICT DO NOTHING;
+INSERT INTO libros (id, isbn, titulo, autor, editorial_id, genero_id) VALUES (3, '978-3', 'El Principito', 'Antoine de Saint-Exupéry', 3, 3) ON CONFLICT DO NOTHING;
+INSERT INTO libros (id, isbn, titulo, autor, editorial_id, genero_id) VALUES (4, '978-4', 'Sapiens', 'Yuval Noah Harari', 4, 4) ON CONFLICT DO NOTHING;
+INSERT INTO libros (id, isbn, titulo, autor, editorial_id, genero_id) VALUES (5, '978-5', '1984', 'George Orwell', 5, 7) ON CONFLICT DO NOTHING;
+INSERT INTO libros (id, isbn, titulo, autor, editorial_id, genero_id) VALUES (6, '978-6', 'Ficciones', 'Jorge Luis Borges', 6, 1) ON CONFLICT DO NOTHING;
+INSERT INTO libros (id, isbn, titulo, autor, editorial_id, genero_id) VALUES (7, '978-7', 'El Aleph', 'Jorge Luis Borges', 7, 1) ON CONFLICT DO NOTHING;
+INSERT INTO libros (id, isbn, titulo, autor, editorial_id, genero_id) VALUES (8, '978-8', 'Dune', 'Frank Herbert', 8, 7) ON CONFLICT DO NOTHING;
+INSERT INTO libros (id, isbn, titulo, autor, editorial_id, genero_id) VALUES (9, '978-9', 'El Resplandor', 'Stephen King', 9, 8) ON CONFLICT DO NOTHING;
+INSERT INTO libros (id, isbn, titulo, autor, editorial_id, genero_id) VALUES (10, '978-10', 'Recetas de mi Abuela', 'Autor Varios', 10, 10) ON CONFLICT DO NOTHING;
+INSERT INTO libros (id, isbn, titulo, autor, editorial_id, genero_id) VALUES (11, '978-1', 'Cien Años de Soledad', 'Gabriel García Márquez', 2, 1) ON CONFLICT DO NOTHING;
