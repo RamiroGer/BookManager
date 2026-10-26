@@ -1,3 +1,6 @@
+## [Ejercicio 07 - README Sprint 3]
+- README actualizado con objetivo, contexto y cambios del sprint.
+
 ## [Ejercicio 07 - Sprint 3]
 - Opción 14: ejecutar el scraping y generar alertas.
 - Opción 15: generar el reporte en Excel.
