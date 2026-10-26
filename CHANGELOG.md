@@ -1,3 +1,9 @@
+## [Ejercicio 04 - Sprint 3]
+- Diferencia ingresada por el usuario antes de cada scraping.
+- Comparación del precio interno (ARS) contra el precio web.
+- CSV de comparación completa y CSV de alertas en reportes.
+- Las alertas se generan cuando la diferencia supera el umbral.
+
 ## [Ejercicio 03 - Sprint 3]
 - Proyecto Scrapy dentro de book_manager/scraper.
 - CuspideSpider busca cada libro y toma los 10 primeros resultados.

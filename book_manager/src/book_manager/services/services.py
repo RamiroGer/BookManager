@@ -4,11 +4,15 @@ from __future__ import annotations
 import csv
 import json
 import os
+import subprocess
+import sys
 import urllib.request
-from datetime import date
+from datetime import date, datetime
 from typing import Dict, List, Optional, Tuple
 
 from dotenv import load_dotenv
+
+from book_manager.database.connection import ConexionDB
 
 from book_manager.entities.entities import (
   CotizacionDolar,
@@ -34,6 +38,16 @@ RUTA_BASE: str = os.path.join(
 )
 RUTA_ENV: str = os.path.join(RUTA_BASE, ".env")
 RUTA_EXPORTS: str = os.path.join(RUTA_BASE, "exports")
+RUTA_SRC: str = os.path.join(RUTA_BASE, "src")
+RUTA_REPORTES: str = os.path.join(
+  os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+  "reportes",
+)
+URL_CUSPIDE: str = "https://cuspide.com"
+COLUMNAS_COMPARACION: List[str] = [
+  "libro", "precio_interno", "precio_web", "diferencia",
+  "alerta", "url", "fecha_extraccion",
+]
 
 load_dotenv(RUTA_ENV)
 
@@ -89,9 +103,9 @@ class ServicioCotizacionDolar:
       tipo: TipoCotizacion = self._buscar_o_crear_tipo(
         NOMBRES_API.get(nombre_api, nombre_api)
       )
-      fecha: str = (
-        str(item.get("fechaActualizacion") or "")[:10]
-        or date.today().isoformat()
+      texto_fecha: str = str(item.get("fechaActualizacion") or "")[:10]
+      fecha: date = (
+        date.fromisoformat(texto_fecha) if texto_fecha else date.today()
       )
       registradas.append(
         self.registrar_cotizacion(
@@ -108,7 +122,7 @@ class ServicioCotizacionDolar:
     tipo_id: int,
     valor_compra: float,
     valor_venta: float,
-    fecha: Optional[str] = None,
+    fecha: Optional[date] = None,
   ) -> CotizacionDolar:
     """Registra la cotización de un tipo y fecha, o la actualiza."""
     tipo: Optional[TipoCotizacion] = self._repo_tipo.leer_por_id(
@@ -116,7 +130,7 @@ class ServicioCotizacionDolar:
     )
     if tipo is None:
       raise ValueError(f"No existe el tipo id={tipo_id}.")
-    fecha_real: str = fecha or date.today().isoformat()
+    fecha_real: date = fecha or date.today()
     existente: Optional[CotizacionDolar] = (
       self._repo_cotizacion.leer_por_tipo_y_fecha(
         tipo_id, fecha_real
@@ -161,6 +175,13 @@ class ServicioPrecio:
     self._repo_moneda = repo_moneda
     self._repo_libro = repo_libro
     self._servicio_cotizacion = servicio_cotizacion
+
+  def mapa_precios(self) -> Dict[Tuple[int, str], Precio]:
+    """Carga todos los precios una sola vez, por (libro_id, moneda)."""
+    return {
+      (p.libro.id, p.moneda.codigo): p
+      for p in self._repo_precio.leer_todos()
+    }
 
   def precios_de_libro(self, libro_id: int) -> List[Precio]:
     """Retorna todos los precios registrados para un libro."""
@@ -212,28 +233,31 @@ class ServicioPrecio:
     return precio_ars.monto, sugerido, diferencia
 
   def aplicar_precio_ars(
-    self, libro_id: int, monto_ars: float
+    self,
+    libro_id: int,
+    monto_ars: float,
+    cotizacion: Optional[CotizacionDolar] = None,
   ) -> Precio:
-    """Actualiza el precio en ARS vigente de un libro."""
+    """Actualiza el precio en ARS y guarda la cotización usada."""
     precio_ars: Optional[Precio] = self.precio_por_moneda(
       libro_id, "ARS"
     )
     if precio_ars is None:
       raise ValueError("El libro no tiene precio en ARS.")
     precio_ars.monto = monto_ars
+    precio_ars.cotizacion = cotizacion
     return self._repo_precio.actualizar(precio_ars)
 
   def lista_bimonetaria(
     self, codigo_otra: str
   ) -> List[Tuple[Libro, Optional[float], Optional[float]]]:
     """Lista cada libro con su precio en ARS y en otra moneda."""
+    precios: Dict[Tuple[int, str], Precio] = self.mapa_precios()
     lista: List[Tuple[Libro, Optional[float], Optional[float]]] = []
     for libro in self._repo_libro.leer_todos():
-      precio_ars: Optional[Precio] = self.precio_por_moneda(
-        libro.id, "ARS"
-      )
-      precio_otra: Optional[Precio] = self.precio_por_moneda(
-        libro.id, codigo_otra
+      precio_ars: Optional[Precio] = precios.get((libro.id, "ARS"))
+      precio_otra: Optional[Precio] = precios.get(
+        (libro.id, codigo_otra.upper())
       )
       lista.append((
         libro,
@@ -247,6 +271,7 @@ class ServicioPrecio:
   ) -> str:
     """Exporta los precios de todas las monedas a un archivo CSV."""
     monedas: List[Moneda] = self._repo_moneda.leer_todos()
+    precios: Dict[Tuple[int, str], Precio] = self.mapa_precios()
     os.makedirs(carpeta, exist_ok=True)
     ruta: str = os.path.join(carpeta, "precios.csv")
     with open(ruta, "w", newline="", encoding="utf-8") as f:
@@ -257,8 +282,8 @@ class ServicioPrecio:
       for libro in self._repo_libro.leer_todos():
         fila: List[str] = [libro.isbn, libro.titulo]
         for moneda in monedas:
-          precio: Optional[Precio] = self.precio_por_moneda(
-            libro.id, moneda.codigo
+          precio: Optional[Precio] = precios.get(
+            (libro.id, moneda.codigo)
           )
           fila.append("" if precio is None else str(precio.monto))
         escritor.writerow(fila)
@@ -323,6 +348,7 @@ class ServicioLibro:
     moneda_ars: Moneda,
     moneda_usd: Moneda,
     cantidad_inicial: int,
+    cotizacion: Optional[CotizacionDolar] = None,
   ) -> Libro:
     """Crea un libro con precios en ARS y USD, y stock asociado."""
     libro: Libro = self._repo_libro.crear(
@@ -335,7 +361,12 @@ class ServicioLibro:
       )
     )
     self._repo_precio.crear(
-      Precio(libro=libro, moneda=moneda_ars, monto=precio_ars)
+      Precio(
+        libro=libro,
+        moneda=moneda_ars,
+        monto=precio_ars,
+        cotizacion=cotizacion,
+      )
     )
     self._repo_precio.crear(
       Precio(libro=libro, moneda=moneda_usd, monto=precio_usd)
@@ -431,17 +462,146 @@ class ServicioReportes:
 
   def catalogo_completo(self) -> List[Dict[str, object]]:
     """Retorna un resumen de cada libro con precios (ARS/USD)."""
+    precios: Dict[int, List[Precio]] = {}
+    for precio in self._servicio_precio.mapa_precios().values():
+      precios.setdefault(precio.libro.id, []).append(precio)
+    stock: Dict[int, Stock] = {
+      s.libro.id: s for s in self._repo_stock.leer_todos()
+    }
     resumen: List[Dict[str, object]] = []
     for libro in self._repo_libro.leer_todos():
-      precios: List[Precio] = (
-        self._servicio_precio.precios_de_libro(libro.id)
-      )
-      stock: Optional[Stock] = (
-        self._repo_stock.leer_por_libro(libro.id)
-      )
+      existencia: Optional[Stock] = stock.get(libro.id)
       resumen.append({
         "libro": libro,
-        "precios": precios,
-        "cantidad": stock.cantidad if stock else 0,
+        "precios": precios.get(libro.id, []),
+        "cantidad": existencia.cantidad if existencia else 0,
       })
     return resumen
+
+
+def _escribir_csv(ruta: str, filas: List[Dict[str, object]]) -> None:
+  """Escribe las comparaciones en CSV, con encabezado aunque esté vacío."""
+  with open(ruta, "w", newline="", encoding="utf-8-sig") as archivo:
+    escritor = csv.DictWriter(archivo, fieldnames=COLUMNAS_COMPARACION)
+    escritor.writeheader()
+    escritor.writerows(filas)
+
+
+
+class ServicioScraping:
+  """Compara los precios internos con los publicados en Cúspide."""
+
+  def __init__(
+    self,
+    conexion: ConexionDB,
+    repo_libro: RepositorioLibro,
+    servicio_precio: ServicioPrecio,
+    base_url: str = URL_CUSPIDE,
+  ) -> None:
+    self._conexion = conexion
+    self._repo_libro = repo_libro
+    self._servicio_precio = servicio_precio
+    self._base_url = base_url
+
+  def ejecutar(self, umbral: float) -> Dict[str, object]:
+    """Ejecuta el scraper y genera el CSV de comparación y el de alertas.
+
+    Args:
+      umbral: Diferencia en pesos desde la cual se genera una alerta.
+
+    Returns:
+      Rutas de los CSV generados y cantidades de comparaciones y alertas.
+    """
+    if umbral < 0:
+      raise ValueError("El umbral no puede ser negativo.")
+    os.makedirs(RUTA_REPORTES, exist_ok=True)
+    ruta_titulos: str = os.path.join(RUTA_REPORTES, "titulos_busqueda.json")
+    ruta_resultados: str = os.path.join(
+      RUTA_REPORTES, "resultados_scraping.jsonl"
+    )
+    titulos: List[str] = [
+      libro.titulo for libro in self._repo_libro.leer_todos()
+    ]
+    with open(ruta_titulos, "w", encoding="utf-8") as archivo:
+      json.dump(titulos, archivo, ensure_ascii=False)
+
+    self._correr_spider(ruta_titulos, ruta_resultados)
+    comparaciones: List[Dict[str, object]] = self._comparar(
+      self._leer_resultados(ruta_resultados), umbral
+    )
+    alertas: List[Dict[str, object]] = [
+      fila for fila in comparaciones if fila["alerta"] == "Sí"
+    ]
+    marca: str = datetime.now().strftime("%Y%m%d_%H%M%S")
+    ruta_comparacion: str = os.path.join(
+      RUTA_REPORTES, f"comparacion_{marca}.csv"
+    )
+    ruta_alertas: str = os.path.join(RUTA_REPORTES, f"alertas_{marca}.csv")
+    _escribir_csv(ruta_comparacion, comparaciones)
+    _escribir_csv(ruta_alertas, alertas)
+    return {
+      "comparadas": len(comparaciones),
+      "alertas": len(alertas),
+      "ruta_comparacion": ruta_comparacion,
+      "ruta_alertas": ruta_alertas,
+    }
+
+  def _correr_spider(self, ruta_titulos: str, ruta_resultados: str) -> None:
+    """Ejecuta el spider en un proceso aparte y espera a que termine."""
+    env: Dict[str, str] = dict(os.environ)
+    env["PYTHONPATH"] = os.pathsep.join(
+      parte for parte in [RUTA_SRC, os.environ.get("PYTHONPATH", "")]
+      if parte
+    )
+    proceso = subprocess.run(
+      [
+        sys.executable, "-m", "book_manager.scraper.ejecutor",
+        "--titulos", ruta_titulos,
+        "--salida", ruta_resultados,
+        "--base-url", self._base_url,
+      ],
+      env=env,
+      capture_output=True,
+      text=True,
+      check=False,
+    )
+    if proceso.returncode != 0:
+      raise ConnectionError(
+        f"Falló el scraping: {proceso.stderr[-300:]}"
+      )
+
+  def _leer_resultados(self, ruta: str) -> List[Dict[str, object]]:
+    """Lee los items que dejó el scraper en formato JSON Lines."""
+    if not os.path.exists(ruta):
+      return []
+    with open(ruta, "r", encoding="utf-8") as archivo:
+      return [json.loads(linea) for linea in archivo if linea.strip()]
+
+  def _comparar(
+    self, resultados: List[Dict[str, object]], umbral: float
+  ) -> List[Dict[str, object]]:
+    """Calcula la diferencia entre el precio web y el interno en ARS."""
+    precios = self._servicio_precio.mapa_precios()
+    precio_interno: Dict[str, float] = {}
+    for libro in self._repo_libro.leer_todos():
+      precio_ars = precios.get((libro.id, "ARS"))
+      if precio_ars is not None:
+        precio_interno[libro.titulo] = precio_ars.monto
+    comparaciones: List[Dict[str, object]] = []
+    for resultado in resultados:
+      titulo: str = str(resultado["titulo_buscado"])
+      if titulo not in precio_interno:
+        continue
+      interno: float = precio_interno[titulo]
+      web: float = float(resultado["precio_web"])
+      diferencia: float = round(web - interno, 2)
+      comparaciones.append({
+        "libro": titulo,
+        "precio_interno": interno,
+        "precio_web": web,
+        "diferencia": diferencia,
+        "alerta": "Sí" if abs(diferencia) >= umbral else "No",
+        "url": resultado["url"],
+        "fecha_extraccion": resultado["fecha_extraccion"],
+      })
+    return comparaciones
