@@ -14,6 +14,7 @@ from typing import Dict, List, Optional, Tuple
 from dotenv import load_dotenv
 from openpyxl import Workbook
 
+from book_manager.database.auditoria import auditar
 from book_manager.database.connection import ConexionDB
 
 from book_manager.entities.entities import (
@@ -512,6 +513,7 @@ class ServicioScraping:
     self._servicio_precio = servicio_precio
     self._base_url = base_url
 
+  @auditar("ejecutar scraping")
   def ejecutar(self, umbral: float) -> Dict[str, object]:
     """Ejecuta el scraper y genera el CSV de comparación y el de alertas.
 
@@ -622,6 +624,7 @@ class ServicioReporteExcel:
   def __init__(self, conexion: ConexionDB) -> None:
     self._conexion = conexion
 
+  @auditar("generar reporte excel")
   def generar(self) -> str:
     """Crea el archivo .xlsx con los campos del reporte y devuelve su ruta."""
     ruta_csv: Optional[str] = _ultima_comparacion()

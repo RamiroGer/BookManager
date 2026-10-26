@@ -2,7 +2,8 @@
 from __future__ import annotations
 
 from sqlalchemy import (
-  Column, Float, ForeignKey, Integer, String, UniqueConstraint,
+  Column, Date, DateTime, Float, ForeignKey, Integer, String,
+  UniqueConstraint,
 )
 from sqlalchemy.orm import relationship
 
@@ -89,7 +90,12 @@ class LibroModel(Base):
 
 
 class PrecioModel(Base):
-  """Tabla de precios de un libro en cada moneda."""
+  """Tabla de precios de un libro en cada moneda.
+
+  Un precio en ARS calculado con una cotización del dólar guarda
+  la cotización usada (cotizacion_id); los precios cargados a mano
+  no tienen cotización asociada.
+  """
 
   __tablename__ = "precios"
   __table_args__ = (
@@ -102,9 +108,13 @@ class PrecioModel(Base):
     Integer, ForeignKey("monedas.id"), nullable=False
   )
   monto = Column(Float, nullable=False)
+  cotizacion_id = Column(
+    Integer, ForeignKey("cotizaciones.id"), nullable=True
+  )
 
   libro = relationship("LibroModel", back_populates="precios")
   moneda = relationship("MonedaModel", back_populates="precios")
+  cotizacion = relationship("CotizacionDolarModel")
 
 
 class StockModel(Base):
@@ -133,8 +143,19 @@ class CotizacionDolarModel(Base):
   tipo_id = Column(
     Integer, ForeignKey("tipos_cotizacion.id"), nullable=False
   )
-  fecha = Column(String(10), nullable=False)
+  fecha = Column(Date, nullable=False)
   valor_compra = Column(Float, nullable=False)
   valor_venta = Column(Float, nullable=False)
 
   tipo = relationship("TipoCotizacionModel", back_populates="cotizaciones")
+
+
+class AuditoriaModel(Base):
+  """Tabla del historial de operaciones de la aplicación."""
+
+  __tablename__ = "auditoria"
+
+  id = Column(Integer, primary_key=True, autoincrement=True)
+  accion = Column(String(100), nullable=False)
+  fecha = Column(DateTime, nullable=False)
+  detalles = Column(String(500), nullable=False)

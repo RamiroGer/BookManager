@@ -1,3 +1,9 @@
+## [Ejercicio 06 - Sprint 3]
+- Decorador auditar aplicado a crear, actualizar y eliminar.
+- Scraping y reporte Excel también quedan auditados.
+- Tabla auditoria con acción, fecha y detalles.
+- Un error queda registrado con el prefijo ERROR.
+
 ## [Ejercicio 05 - Sprint 3]
 - Reporte Excel con libro, precio interno, precio web, diferencia y fecha.
 - Se genera a partir de la última comparación de precios.

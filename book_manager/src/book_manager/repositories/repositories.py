@@ -2,13 +2,16 @@
 from __future__ import annotations
 
 import abc
+from datetime import date
 from typing import Any, Generic, List, Optional, Type, TypeVar
 
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
+from book_manager.database.auditoria import auditar
 from book_manager.database.connection import ConexionDB
 from book_manager.entities.entities import (
+  Auditoria,
   CotizacionDolar,
   Editorial,
   EntidadBase,
@@ -20,6 +23,7 @@ from book_manager.entities.entities import (
   TipoCotizacion,
 )
 from book_manager.models.models import (
+  AuditoriaModel,
   CotizacionDolarModel,
   EditorialModel,
   GeneroModel,
@@ -51,6 +55,17 @@ def _moneda(m: MonedaModel) -> Moneda:
 def _tipo(m: TipoCotizacionModel) -> TipoCotizacion:
   """Convierte un modelo de tipo de cotización en entidad."""
   return TipoCotizacion(nombre=m.nombre, id=m.id)
+
+
+def _cotizacion(m: CotizacionDolarModel) -> CotizacionDolar:
+  """Convierte un modelo de cotización del dólar en entidad."""
+  return CotizacionDolar(
+    tipo=_tipo(m.tipo),
+    fecha=m.fecha,
+    valor_compra=m.valor_compra,
+    valor_venta=m.valor_venta,
+    id=m.id,
+  )
 
 
 def _libro(m: LibroModel) -> Libro:
@@ -115,6 +130,7 @@ class RepositorioDBBase(IRepositorio[T], abc.ABC):
         "Dato duplicado o referencia inexistente."
       ) from error
 
+  @auditar("crear")
   def crear(self, entidad: T) -> T:
     with self._conexion.transaccion() as sesion:
       modelo = self._modelo()
@@ -128,13 +144,18 @@ class RepositorioDBBase(IRepositorio[T], abc.ABC):
       modelo = sesion.get(self._modelo, id)
       return None if modelo is None else self._a_entidad(modelo)
 
+  def _cargas(self) -> List[Any]:
+    """Relaciones que se cargan junto con cada modelo (evita N+1)."""
+    return []
+
   def leer_todos(self) -> List[T]:
     with self._conexion.transaccion() as sesion:
-      modelos = sesion.query(self._modelo).order_by(
-        self._modelo.id
-      ).all()
+      modelos = sesion.query(self._modelo).options(
+        *self._cargas()
+      ).order_by(self._modelo.id).all()
       return [self._a_entidad(m) for m in modelos]
 
+  @auditar("actualizar")
   def actualizar(self, entidad: T) -> T:
     with self._conexion.transaccion() as sesion:
       modelo = sesion.get(self._modelo, entidad.id)
@@ -146,6 +167,7 @@ class RepositorioDBBase(IRepositorio[T], abc.ABC):
       self._guardar(sesion, modelo)
     return entidad
 
+  @auditar("eliminar")
   def eliminar(self, id: int) -> bool:
     with self._conexion.transaccion() as sesion:
       modelo = sesion.get(self._modelo, id)
@@ -226,6 +248,12 @@ class RepositorioLibro(RepositorioDBBase[Libro]):
   def __init__(self, conexion: ConexionDB) -> None:
     super().__init__(conexion, LibroModel)
 
+  def _cargas(self) -> List[Any]:
+    return [
+      joinedload(LibroModel.editorial),
+      joinedload(LibroModel.genero),
+    ]
+
   def _a_entidad(self, modelo: LibroModel) -> Libro:
     return _libro(modelo)
 
@@ -243,11 +271,26 @@ class RepositorioPrecio(RepositorioDBBase[Precio]):
   def __init__(self, conexion: ConexionDB) -> None:
     super().__init__(conexion, PrecioModel)
 
+  def _cargas(self) -> List[Any]:
+    return [
+      joinedload(PrecioModel.libro).joinedload(LibroModel.editorial),
+      joinedload(PrecioModel.libro).joinedload(LibroModel.genero),
+      joinedload(PrecioModel.moneda),
+      joinedload(PrecioModel.cotizacion).joinedload(
+        CotizacionDolarModel.tipo
+      ),
+    ]
+
   def _a_entidad(self, modelo: PrecioModel) -> Precio:
+    cotizacion: Optional[CotizacionDolar] = (
+      None if modelo.cotizacion is None
+      else _cotizacion(modelo.cotizacion)
+    )
     return Precio(
       libro=_libro(modelo.libro),
       moneda=_moneda(modelo.moneda),
       monto=modelo.monto,
+      cotizacion=cotizacion,
       id=modelo.id,
     )
 
@@ -255,6 +298,9 @@ class RepositorioPrecio(RepositorioDBBase[Precio]):
     modelo.libro_id = entidad.libro.id
     modelo.moneda_id = entidad.moneda.id
     modelo.monto = entidad.monto
+    modelo.cotizacion_id = (
+      None if entidad.cotizacion is None else entidad.cotizacion.id
+    )
 
 
 class IRepositorioStock(abc.ABC):
@@ -282,6 +328,12 @@ class RepositorioStock(RepositorioDBBase[Stock], IRepositorioStock):
 
   def __init__(self, conexion: ConexionDB) -> None:
     super().__init__(conexion, StockModel)
+
+  def _cargas(self) -> List[Any]:
+    return [
+      joinedload(StockModel.libro).joinedload(LibroModel.editorial),
+      joinedload(StockModel.libro).joinedload(LibroModel.genero),
+    ]
 
   def _a_entidad(self, modelo: StockModel) -> Stock:
     return Stock(
@@ -319,7 +371,7 @@ class IRepositorioCotizacionDolar(abc.ABC):
 
   @abc.abstractmethod
   def leer_por_tipo_y_fecha(
-    self, tipo_id: int, fecha: str
+    self, tipo_id: int, fecha: date
   ) -> Optional[CotizacionDolar]:
     """Lee una cotización por tipo y fecha."""
 
@@ -336,7 +388,7 @@ class IRepositorioCotizacionDolar(abc.ABC):
     """Actualiza una cotización existente."""
 
   @abc.abstractmethod
-  def eliminar(self, tipo_id: int, fecha: str) -> bool:
+  def eliminar(self, tipo_id: int, fecha: date) -> bool:
     """Elimina una cotización por tipo y fecha."""
 
 
@@ -348,16 +400,13 @@ class RepositorioCotizacionDolar(
   def __init__(self, conexion: ConexionDB) -> None:
     super().__init__(conexion, CotizacionDolarModel)
 
+  def _cargas(self) -> List[Any]:
+    return [joinedload(CotizacionDolarModel.tipo)]
+
   def _a_entidad(
     self, modelo: CotizacionDolarModel
   ) -> CotizacionDolar:
-    return CotizacionDolar(
-      tipo=_tipo(modelo.tipo),
-      fecha=modelo.fecha,
-      valor_compra=modelo.valor_compra,
-      valor_venta=modelo.valor_venta,
-      id=modelo.id,
-    )
+    return _cotizacion(modelo)
 
   def _volcar(
     self, modelo: CotizacionDolarModel, entidad: CotizacionDolar
@@ -368,7 +417,7 @@ class RepositorioCotizacionDolar(
     modelo.valor_venta = entidad.valor_venta
 
   def leer_por_tipo_y_fecha(
-    self, tipo_id: int, fecha: str
+    self, tipo_id: int, fecha: date
   ) -> Optional[CotizacionDolar]:
     with self._conexion.transaccion() as sesion:
       modelo = sesion.query(CotizacionDolarModel).filter_by(
@@ -385,10 +434,33 @@ class RepositorioCotizacionDolar(
       ).order_by(CotizacionDolarModel.fecha).all()
       return [self._a_entidad(m) for m in modelos]
 
-  def eliminar(self, tipo_id: int, fecha: str) -> bool:
+  def eliminar(self, tipo_id: int, fecha: date) -> bool:
     cot: Optional[CotizacionDolar] = self.leer_por_tipo_y_fecha(
       tipo_id, fecha
     )
     if cot is None:
       return False
     return super().eliminar(cot.id)
+
+
+class RepositorioAuditoria(RepositorioDBBase[Auditoria]):
+  """Repositorio del historial de auditoría (solo lectura desde la consola).
+
+  Los registros los escriben los decoradores de auditoría, no este repositorio.
+  """
+
+  def __init__(self, conexion: ConexionDB) -> None:
+    super().__init__(conexion, AuditoriaModel)
+
+  def _a_entidad(self, modelo: AuditoriaModel) -> Auditoria:
+    return Auditoria(
+      accion=modelo.accion,
+      fecha=modelo.fecha,
+      detalles=modelo.detalles,
+      id=modelo.id,
+    )
+
+  def _volcar(self, modelo: AuditoriaModel, entidad: Auditoria) -> None:
+    modelo.accion = entidad.accion
+    modelo.fecha = entidad.fecha
+    modelo.detalles = entidad.detalles

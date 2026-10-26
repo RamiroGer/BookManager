@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import abc
-from datetime import date
+from datetime import date, datetime
 from typing import Optional
 
 
@@ -200,12 +200,14 @@ class Precio(EntidadBase):
     libro: Libro,
     moneda: Moneda,
     monto: float,
+    cotizacion: Optional[CotizacionDolar] = None,
     id: Optional[int] = None,
   ) -> None:
     super().__init__(id)
     self._libro = libro
     self._moneda = moneda
     self.monto = monto
+    self._cotizacion = cotizacion
 
   @property
   def libro(self) -> Libro:
@@ -224,6 +226,14 @@ class Precio(EntidadBase):
     self._moneda = valor
 
   @property
+  def cotizacion(self) -> Optional[CotizacionDolar]:
+    return self._cotizacion
+
+  @cotizacion.setter
+  def cotizacion(self, valor: Optional[CotizacionDolar]) -> None:
+    self._cotizacion = valor
+
+  @property
   def monto(self) -> float:
     return self._monto
 
@@ -234,10 +244,16 @@ class Precio(EntidadBase):
     self._monto = valor
 
   def __repr__(self) -> str:
-    return (
+    texto: str = (
       f"Precio(id={self.id}, libro={self.libro.titulo!r}, "
-      f"monto={self.monto} {self.moneda.codigo})"
+      f"monto={self.monto} {self.moneda.codigo}"
     )
+    if self.cotizacion is not None:
+      texto += (
+        f", cotización={self.cotizacion.tipo.nombre} "
+        f"{self.cotizacion.fecha.isoformat()}"
+      )
+    return texto + ")"
 
 
 class Stock(EntidadBase):
@@ -327,5 +343,51 @@ class CotizacionDolar(EntidadBase):
   def __repr__(self) -> str:
     return (
       f"CotizacionDolar(tipo={self.tipo.nombre!r}, "
-      f"fecha={self.fecha!r}, venta={self.valor_venta})"
+      f"fecha={self.fecha.isoformat()}, venta={self.valor_venta})"
+    )
+
+
+class Auditoria(EntidadBase):
+  """Registro de una operación realizada en el sistema."""
+
+  def __init__(
+    self,
+    accion: str,
+    fecha: datetime,
+    detalles: str,
+    id: Optional[int] = None,
+  ) -> None:
+    super().__init__(id)
+    self._accion = accion
+    self._fecha = fecha
+    self._detalles = detalles
+
+  @property
+  def accion(self) -> str:
+    return self._accion
+
+  @accion.setter
+  def accion(self, valor: str) -> None:
+    self._accion = valor
+
+  @property
+  def fecha(self) -> datetime:
+    return self._fecha
+
+  @fecha.setter
+  def fecha(self, valor: datetime) -> None:
+    self._fecha = valor
+
+  @property
+  def detalles(self) -> str:
+    return self._detalles
+
+  @detalles.setter
+  def detalles(self, valor: str) -> None:
+    self._detalles = valor
+
+  def __repr__(self) -> str:
+    return (
+      f"Auditoria(fecha={self._fecha:%Y-%m-%d %H:%M:%S}, "
+      f"accion={self._accion!r}, detalles={self._detalles!r})"
     )
