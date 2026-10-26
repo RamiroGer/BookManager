@@ -1,3 +1,7 @@
+## [Ejercicio 02 - Sprint 3]
+- cargar_datos_sql ejecuta los .sql de una carpeta en orden.
+- Las secuencias de los ids se ajustan después de la carga.
+
 ## [Ejercicio 01 - Sprint 3]
 - Rama Sprint_3 creada a partir de Sprint_2.
 - Carpeta reportes para los CSV y Excel generados.

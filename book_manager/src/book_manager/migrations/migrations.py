@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import csv
 import os
+from datetime import date
 from typing import Dict, List, Optional, Set, Tuple
 
 from sqlalchemy import text
@@ -54,7 +55,7 @@ TABLAS: List[Tuple[str, str, Dict[str, str]]] = [
   (
     "cotizaciones.csv", "cotizaciones",
     {
-      "id": "int", "tipo_id": "int", "fecha": "str",
+      "id": "int", "tipo_id": "int", "fecha": "date",
       "valor_compra": "float", "valor_venta": "float",
     },
   ),
@@ -67,6 +68,8 @@ def _literal_sql(valor: str, tipo: str) -> str:
     return str(int(valor))
   if tipo == "float":
     return str(float(valor))
+  if tipo == "date":
+    return "'" + date.fromisoformat(valor).isoformat() + "'"
   return "'" + valor.replace("'", "''") + "'"
 
 
@@ -190,5 +193,26 @@ def migrar_datos(
     with open(ruta_sql, "w", encoding="utf-8") as f:
       f.write("\n".join(sentencias) + "\n")
     resumen[tabla] = _ejecutar_sql(conexion, ruta_sql)
+  _reiniciar_secuencias(conexion)
+  return resumen
+
+
+def cargar_datos_sql(
+  conexion: ConexionDB, carpeta_sqls: str
+) -> Dict[str, int]:
+  """Ejecuta en la base los archivos .sql de una carpeta, en orden.
+
+  Args:
+    conexion: Conexión a la base donde se cargan los datos.
+    carpeta_sqls: Carpeta con los archivos .sql generados en la migración.
+
+  Returns:
+    Cantidad de sentencias ejecutadas por archivo.
+  """
+  resumen: Dict[str, int] = {}
+  for archivo in sorted(os.listdir(carpeta_sqls)):
+    if archivo.endswith(".sql"):
+      ruta_sql: str = os.path.join(carpeta_sqls, archivo)
+      resumen[archivo] = _ejecutar_sql(conexion, ruta_sql)
   _reiniciar_secuencias(conexion)
   return resumen
