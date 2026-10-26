@@ -1,3 +1,7 @@
+## [Ejercicio 05 - Sprint 3]
+- Reporte Excel con libro, precio interno, precio web, diferencia y fecha.
+- Se genera a partir de la última comparación de precios.
+
 ## [Ejercicio 04 - Sprint 3]
 - Diferencia ingresada por el usuario antes de cada scraping.
 - Comparación del precio interno (ARS) contra el precio web.

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import csv
+import glob
 import json
 import os
 import subprocess
@@ -11,6 +12,7 @@ from datetime import date, datetime
 from typing import Dict, List, Optional, Tuple
 
 from dotenv import load_dotenv
+from openpyxl import Workbook
 
 from book_manager.database.connection import ConexionDB
 
@@ -487,6 +489,13 @@ def _escribir_csv(ruta: str, filas: List[Dict[str, object]]) -> None:
     escritor.writerows(filas)
 
 
+def _ultima_comparacion() -> Optional[str]:
+  """Devuelve la ruta de la comparación más reciente, si existe."""
+  archivos: List[str] = sorted(
+    glob.glob(os.path.join(RUTA_REPORTES, "comparacion_*.csv"))
+  )
+  return archivos[-1] if archivos else None
+
 
 class ServicioScraping:
   """Compara los precios internos con los publicados en Cúspide."""
@@ -605,3 +614,38 @@ class ServicioScraping:
         "fecha_extraccion": resultado["fecha_extraccion"],
       })
     return comparaciones
+
+
+class ServicioReporteExcel:
+  """Genera el reporte en Excel a partir de la última comparación."""
+
+  def __init__(self, conexion: ConexionDB) -> None:
+    self._conexion = conexion
+
+  def generar(self) -> str:
+    """Crea el archivo .xlsx con los campos del reporte y devuelve su ruta."""
+    ruta_csv: Optional[str] = _ultima_comparacion()
+    if ruta_csv is None:
+      raise ValueError(
+        "No hay comparaciones. Ejecute el scraping primero."
+      )
+    libro_excel = Workbook()
+    hoja = libro_excel.active
+    hoja.title = "Precios web"
+    hoja.append([
+      "Libro", "Precio interno", "Precio web",
+      "Diferencia", "Fecha de extracción",
+    ])
+    with open(ruta_csv, "r", newline="", encoding="utf-8-sig") as archivo:
+      for fila in csv.DictReader(archivo):
+        hoja.append([
+          fila["libro"],
+          float(fila["precio_interno"]),
+          float(fila["precio_web"]),
+          float(fila["diferencia"]),
+          fila["fecha_extraccion"],
+        ])
+    marca: str = datetime.now().strftime("%Y%m%d_%H%M%S")
+    ruta: str = os.path.join(RUTA_REPORTES, f"reporte_{marca}.xlsx")
+    libro_excel.save(ruta)
+    return ruta
