@@ -1,3 +1,11 @@
+## [Ejercicio 03 - Sprint 3]
+- Proyecto Scrapy dentro de book_manager/scraper.
+- CuspideSpider busca cada libro y toma los 10 primeros resultados.
+- Solo se siguen las publicaciones cuyo título es el del libro o su subtítulo o edición.
+- LibroWebLoader convierte el precio y limpia los textos.
+- Pipelines: se descartan publicaciones sin precio y se exporta JSON Lines.
+- El scraper corre en un proceso aparte para no reiniciar el reactor.
+
 ## [Ejercicio 02 - Sprint 3]
 - cargar_datos_sql ejecuta los .sql de una carpeta en orden.
 - Las secuencias de los ids se ajustan después de la carga.
