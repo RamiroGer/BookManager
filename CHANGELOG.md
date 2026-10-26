@@ -1,3 +1,7 @@
+## [Ejercicio 01 - Sprint 3]
+- Rama Sprint_3 creada a partir de Sprint_2.
+- Carpeta reportes para los CSV y Excel generados.
+
 ## [Ejercicio 08 - README Sprint 2]
 - README actualizado con objetivo, contexto y decisiones de diseño.
 
