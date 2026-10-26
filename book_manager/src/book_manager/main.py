@@ -11,6 +11,7 @@ from book_manager.preload_data.preload_data import (
   generar_csvs_iniciales,
 )
 from book_manager.repositories.repositories import (
+  RepositorioAuditoria,
   RepositorioCotizacionDolar,
   RepositorioEditorial,
   RepositorioGenero,
@@ -25,12 +26,17 @@ from book_manager.services.services import (
   ServicioCotizacionDolar,
   ServicioLibro,
   ServicioPrecio,
+  ServicioReporteExcel,
   ServicioReportes,
+  ServicioScraping,
   ServicioStock,
 )
 from book_manager.ui.console import (
   exportar_precios,
   menu_cotizaciones,
+  opcion_ejecutar_scraping,
+  opcion_generar_reporte,
+  opcion_historial_auditoria,
   menu_editoriales,
   menu_generos,
   menu_libros,
@@ -59,6 +65,9 @@ OPCIONES_MENU: str = """
 11) Obtener cotizaciones por API
 12) Lista de precios bimonetaria
 13) Exportar precios a CSV
+14) Ejecutar scraping (Cúspide)
+15) Generar reporte en Excel
+16) Historial de auditoría
 0) Salir
 ========================="""
 
@@ -95,6 +104,11 @@ def main(import_default_data: bool = True) -> None:
   servicio_reportes = ServicioReportes(
     repo_libro, repo_stock, servicio_precio
   )
+  repo_auditoria = RepositorioAuditoria(conexion)
+  servicio_scraping = ServicioScraping(
+    conexion, repo_libro, servicio_precio
+  )
+  servicio_reporte_excel = ServicioReporteExcel(conexion)
 
   if import_default_data or not repo_libro.leer_todos():
     generar_csvs_iniciales()
@@ -117,7 +131,7 @@ def main(import_default_data: bool = True) -> None:
       elif opcion == "5":
         menu_libros(
           servicio_libro, repo_libro, repo_editorial,
-          repo_genero, repo_moneda,
+          repo_genero, repo_moneda, servicio_cotizacion, repo_tipo,
         )
       elif opcion == "6":
         menu_precios(
@@ -140,6 +154,12 @@ def main(import_default_data: bool = True) -> None:
         reporte_precios_bimonetarios(servicio_precio, repo_moneda)
       elif opcion == "13":
         exportar_precios(servicio_precio)
+      elif opcion == "14":
+        opcion_ejecutar_scraping(servicio_scraping)
+      elif opcion == "15":
+        opcion_generar_reporte(servicio_reporte_excel)
+      elif opcion == "16":
+        opcion_historial_auditoria(repo_auditoria)
       elif opcion == "0":
         print("Saliendo del sistema. ¡Hasta luego!")
         break

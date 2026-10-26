@@ -1,13 +1,15 @@
 """Interfaz de consola (CLI) para el sistema Book Manager."""
 from __future__ import annotations
 
+from datetime import date
 from typing import Callable, Dict, List, Optional
 
 from book_manager.entities.entities import (
-  Editorial, Genero, Libro, Moneda, TipoCotizacion,
+  CotizacionDolar, Editorial, Genero, Libro, Moneda, TipoCotizacion,
 )
 from book_manager.repositories.repositories import (
   IRepositorio,
+  RepositorioAuditoria,
   RepositorioCotizacionDolar,
   RepositorioEditorial,
   RepositorioGenero,
@@ -21,7 +23,9 @@ from book_manager.services.services import (
   ServicioCotizacionDolar,
   ServicioLibro,
   ServicioPrecio,
+  ServicioReporteExcel,
   ServicioReportes,
+  ServicioScraping,
   ServicioStock,
 )
 
@@ -153,6 +157,8 @@ def menu_libros(
   repo_editorial: RepositorioEditorial,
   repo_genero: RepositorioGenero,
   repo_moneda: RepositorioMoneda,
+  servicio_cotizacion: ServicioCotizacionDolar,
+  repo_tipo: RepositorioTipoCotizacion,
 ) -> None:
   """Gestiona el CRUD completo de libros."""
   print("\n--- Listado de Libros ---")
@@ -167,7 +173,8 @@ def menu_libros(
 
   if opcion == "1":
     _alta_libro(
-      servicio_libro, repo_editorial, repo_genero, repo_moneda
+      servicio_libro, repo_editorial, repo_genero, repo_moneda,
+      servicio_cotizacion, repo_tipo,
     )
   elif opcion == "2":
     _modificar_libro(repo_libro, repo_editorial, repo_genero)
@@ -187,6 +194,8 @@ def _alta_libro(
   repo_editorial: RepositorioEditorial,
   repo_genero: RepositorioGenero,
   repo_moneda: RepositorioMoneda,
+  servicio_cotizacion: ServicioCotizacionDolar,
+  repo_tipo: RepositorioTipoCotizacion,
 ) -> None:
   """Da de alta un libro nuevo con sus precios y stock inicial."""
   if not repo_editorial.leer_todos() or not repo_genero.leer_todos():
@@ -228,6 +237,12 @@ def _alta_libro(
     print("Deben existir las monedas ARS y USD.")
     return
 
+  cotizacion: Optional[CotizacionDolar] = _elegir_cotizacion(
+    servicio_cotizacion, repo_tipo
+  )
+  if cotizacion is None:
+    return
+
   precio_ars: float = float(input("Precio (ARS): "))
   precio_usd: float = float(input("Precio (USD): "))
   cantidad: int = int(input("Cantidad inicial de stock: "))
@@ -243,6 +258,7 @@ def _alta_libro(
     moneda_ars=moneda_ars,
     moneda_usd=moneda_usd,
     cantidad_inicial=cantidad,
+    cotizacion=cotizacion,
   )
   print(f"Creado: {nuevo}")
 
@@ -300,6 +316,13 @@ def menu_precios(
     if precio is None:
       print(f"No existe id={id_}.")
       return
+    if precio.moneda.codigo == "ARS":
+      cotizacion = _elegir_cotizacion(servicio_cotizacion, repo_tipo)
+      if cotizacion is None:
+        return
+      precio.cotizacion = cotizacion
+    else:
+      precio.cotizacion = None
     precio.monto = float(
       input(f"Nuevo monto (actual: {precio.monto}): ")
     )
@@ -335,7 +358,9 @@ def _sugerir_y_aplicar_precio(
     print(f"No existe el tipo id={tipo_id}.")
     return
 
-  _obtener_o_cargar_cotizacion(servicio_cotizacion, tipo)
+  cotizacion: CotizacionDolar = _obtener_o_cargar_cotizacion(
+    servicio_cotizacion, tipo
+  )
 
   try:
     actual, sugerido, diferencia = (
@@ -346,12 +371,16 @@ def _sugerir_y_aplicar_precio(
     return
 
   print(f"\nPrecio ARS actual: ${actual}")
+  print(
+    f"Cotización usada ({tipo.nombre}, {cotizacion.fecha}): "
+    f"${cotizacion.valor_venta}"
+  )
   print(f"Precio ARS sugerido ({tipo.nombre}): ${sugerido}")
   print(f"Diferencia: ${diferencia}")
 
   if _confirmar_accion("\n¿Aplicar el precio sugerido al libro?"):
     actualizado = servicio_precio.aplicar_precio_ars(
-      libro_id, sugerido
+      libro_id, sugerido, cotizacion
     )
     print(f"Precio actualizado: {actualizado}")
   else:
@@ -361,13 +390,13 @@ def _sugerir_y_aplicar_precio(
 def _obtener_o_cargar_cotizacion(
   servicio_cotizacion: ServicioCotizacionDolar,
   tipo: TipoCotizacion,
-) -> None:
-  """Asegura que exista una cotización vigente para un tipo."""
+) -> CotizacionDolar:
+  """Devuelve la cotización vigente de un tipo, cargándola si falta."""
   cotizacion = servicio_cotizacion.obtener_ultima_cotizacion(
     tipo.id
   )
   if cotizacion is not None:
-    return
+    return cotizacion
 
   print(f"No hay cotización registrada para \"{tipo.nombre}\".")
   print("Consultando cotizaciones en la API...")
@@ -376,15 +405,31 @@ def _obtener_o_cargar_cotizacion(
   except (ConnectionError, ValueError) as error:
     print(f"No se pudo usar la API: {error}")
 
-  if servicio_cotizacion.obtener_ultima_cotizacion(tipo.id):
-    return
+  cotizacion = servicio_cotizacion.obtener_ultima_cotizacion(tipo.id)
+  if cotizacion is not None:
+    return cotizacion
 
   print("Ingrese los valores manualmente:")
   valor_compra: float = float(input("Valor de compra (ARS): "))
   valor_venta: float = float(input("Valor de venta (ARS): "))
-  servicio_cotizacion.registrar_cotizacion(
+  return servicio_cotizacion.registrar_cotizacion(
     tipo.id, valor_compra, valor_venta
   )
+
+
+def _elegir_cotizacion(
+  servicio_cotizacion: ServicioCotizacionDolar,
+  repo_tipo: RepositorioTipoCotizacion,
+) -> Optional[CotizacionDolar]:
+  """Pide un tipo de cotización y devuelve su cotización vigente."""
+  for t in repo_tipo.leer_todos():
+    print(f"  [{t.id}] {t.nombre}")
+  tipo_id: int = int(input("ID de tipo de cotización: "))
+  tipo: Optional[TipoCotizacion] = repo_tipo.leer_por_id(tipo_id)
+  if tipo is None:
+    print(f"No existe el tipo id={tipo_id}.")
+    return None
+  return _obtener_o_cargar_cotizacion(servicio_cotizacion, tipo)
 
 
 def menu_stock(
@@ -472,7 +517,9 @@ def menu_cotizaciones(
     print(f"Actualizada: {repo_cotizacion.actualizar(cot)}")
   elif opcion == "3":
     tipo_id: int = int(input("ID de tipo: "))
-    fecha: str = input("Fecha (YYYY-MM-DD): ")
+    fecha: date = date.fromisoformat(
+      input("Fecha (YYYY-MM-DD): ").strip()
+    )
     eliminado: bool = repo_cotizacion.eliminar(tipo_id, fecha)
     mensaje: str = (
       "Eliminada."
@@ -596,3 +643,41 @@ def exportar_precios(servicio_precio: ServicioPrecio) -> None:
   """Exporta los precios de todas las monedas a un CSV."""
   ruta: str = servicio_precio.exportar_precios_csv()
   print(f"Precios exportados en: {ruta}")
+
+
+def opcion_ejecutar_scraping(servicio_scraping: ServicioScraping) -> None:
+  """Pide la diferencia para las alertas y ejecuta el scraping."""
+  print("\n--- Ejecutar scraping (Cúspide) ---")
+  umbral: float = float(
+    input("Diferencia de precio para generar alerta (ARS): ")
+  )
+  print("Buscando los libros del catálogo en Cúspide...")
+  try:
+    resultado = servicio_scraping.ejecutar(umbral)
+  except (ConnectionError, ValueError) as error:
+    print(f"No se pudo ejecutar el scraping: {error}")
+    return
+  print(f"Libros comparados: {resultado['comparadas']}")
+  print(f"Alertas generadas: {resultado['alertas']}")
+  print(f"Comparación completa: {resultado['ruta_comparacion']}")
+  print(f"Alertas (CSV para descargar): {resultado['ruta_alertas']}")
+
+
+def opcion_generar_reporte(servicio_reporte: ServicioReporteExcel) -> None:
+  """Genera el reporte en Excel con la última comparación."""
+  print("\n--- Generar reporte en Excel ---")
+  try:
+    ruta: str = servicio_reporte.generar()
+  except ValueError as error:
+    print(f"No se pudo generar el reporte: {error}")
+    return
+  print(f"Reporte generado: {ruta}")
+
+
+def opcion_historial_auditoria(repo_auditoria: RepositorioAuditoria) -> None:
+  """Muestra los últimos registros de auditoría, el más reciente primero."""
+  print("\n--- Historial de auditoría (últimos 50) ---")
+  registros = repo_auditoria.leer_todos()
+  for registro in reversed(registros[-50:]):
+    print(f"  {registro}")
+  print(f"{len(registros)} registros en total.")

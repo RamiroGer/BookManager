@@ -1,3 +1,8 @@
+## [Ejercicio 07 - Sprint 3]
+- Opción 14: ejecutar el scraping y generar alertas.
+- Opción 15: generar el reporte en Excel.
+- Opción 16: ver el historial de auditoría.
+
 ## [Ejercicio 06 - Sprint 3]
 - Decorador auditar aplicado a crear, actualizar y eliminar.
 - Scraping y reporte Excel también quedan auditados.
